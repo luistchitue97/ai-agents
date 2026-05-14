@@ -321,6 +321,19 @@ export default function AgentsPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={table.getFilteredSelectedRowModel().rows.length === 0}
+            >
+              <Trash2Icon />
+              <span className="hidden lg:inline">
+                Delete{" "}
+                {table.getFilteredSelectedRowModel().rows.length > 0
+                  ? `(${table.getFilteredSelectedRowModel().rows.length})`
+                  : "Selected"}
+              </span>
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm">
@@ -402,15 +415,6 @@ export default function AgentsPage() {
             </div>
             <div className="flex w-full items-center gap-8 lg:w-fit">
               <div className="hidden items-center gap-2 lg:flex">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="size-8"
-                  disabled={table.getFilteredSelectedRowModel().rows.length === 0}
-                >
-                  <Trash2Icon />
-                  <span className="sr-only">Delete selected agents</span>
-                </Button>
                 <Label htmlFor="rows-per-page" className="text-sm font-medium">
                   Rows per page
                 </Label>
