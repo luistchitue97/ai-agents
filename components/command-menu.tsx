@@ -8,6 +8,7 @@ import {
   ChartBarIcon,
   FolderIcon,
   UsersIcon,
+  PlugZapIcon,
   Settings2Icon,
   CircleHelpIcon,
   DatabaseIcon,
@@ -35,6 +36,7 @@ const searchItems = [
       { title: "Analytics", url: "/dashboard/analytics", icon: ChartBarIcon },
       { title: "Projects", url: "/dashboard/projects", icon: FolderIcon },
       { title: "Team", url: "/dashboard/team", icon: UsersIcon },
+      { title: "Integrations", url: "/dashboard/integrations", icon: PlugZapIcon },
     ],
   },
   {
