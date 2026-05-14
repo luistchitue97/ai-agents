@@ -4,6 +4,7 @@ import {
   ActivityIcon,
   ArrowLeftIcon,
   BotIcon,
+  ScrollTextIcon,
   PauseIcon,
   PlayIcon,
   SaveIcon,
@@ -87,6 +88,12 @@ export default async function AgentConfigPage({
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/dashboard/agents/${agent.id}/logs`}>
+                <ScrollTextIcon />
+                View logs
+              </Link>
+            </Button>
             <Button variant="outline" size="sm">
               {agent.status === "paused" ? (
                 <><PlayIcon />Resume</>

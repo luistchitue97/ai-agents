@@ -212,7 +212,9 @@ const columns: ColumnDef<Agent>[] = [
             <DropdownMenuItem asChild>
               <Link href={`/dashboard/agents/${row.original.id}`}>Configure</Link>
             </DropdownMenuItem>
-            <DropdownMenuItem>View logs</DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href={`/dashboard/agents/${row.original.id}/logs`}>View logs</Link>
+            </DropdownMenuItem>
             <DropdownMenuItem>Duplicate</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
