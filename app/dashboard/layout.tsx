@@ -1,4 +1,5 @@
 import { AppSidebar } from "@/components/app-sidebar"
+import { CommandMenu } from "@/components/command-menu"
 import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 
@@ -17,6 +18,7 @@ export default function DashboardLayout({
       }
     >
       <AppSidebar variant="inset" />
+      <CommandMenu />
       <SidebarInset>
         <SiteHeader />
         <div className="flex flex-1 flex-col">
