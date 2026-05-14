@@ -28,6 +28,7 @@ import {
   PauseIcon,
   PlayIcon,
   PlusIcon,
+  Trash2Icon,
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -401,6 +402,15 @@ export default function AgentsPage() {
             </div>
             <div className="flex w-full items-center gap-8 lg:w-fit">
               <div className="hidden items-center gap-2 lg:flex">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="size-8"
+                  disabled={table.getFilteredSelectedRowModel().rows.length === 0}
+                >
+                  <Trash2Icon />
+                  <span className="sr-only">Delete selected agents</span>
+                </Button>
                 <Label htmlFor="rows-per-page" className="text-sm font-medium">
                   Rows per page
                 </Label>
