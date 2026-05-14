@@ -40,6 +40,8 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
+  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
@@ -56,6 +58,7 @@ import {
   InputOTPSeparator,
   InputOTPSlot,
 } from "@/components/ui/input-otp"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -74,7 +77,25 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import { z } from "zod"
+
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { Textarea } from "@/components/ui/textarea"
 import { agentsData, type Agent, type AgentStatus } from "./data"
+
+const newAgentSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters").max(50, "Name must be 50 characters or fewer"),
+  description: z.string().min(10, "Description must be at least 10 characters").max(200, "Description must be 200 characters or fewer"),
+})
 
 const statusConfig: Record<AgentStatus, { label: string; className: string }> = {
   active: { label: "Active", className: "bg-green-500/10 text-green-600 border-green-500/20" },
@@ -234,6 +255,18 @@ export default function AgentsPage() {
   const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 10 })
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
   const [otp, setOtp] = React.useState("")
+  const [newAgentDialogOpen, setNewAgentDialogOpen] = React.useState(false)
+
+  const newAgentForm = useForm<z.infer<typeof newAgentSchema>>({
+    resolver: zodResolver(newAgentSchema),
+    defaultValues: { name: "", description: "" },
+  })
+
+  function onNewAgentSubmit(values: z.infer<typeof newAgentSchema>) {
+    console.log(values)
+    setNewAgentDialogOpen(false)
+    newAgentForm.reset()
+  }
 
   const table = useReactTable({
     data,
@@ -305,7 +338,7 @@ export default function AgentsPage() {
                   ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button size="sm">
+            <Button size="sm" onClick={() => setNewAgentDialogOpen(true)}>
               <PlusIcon />
               <span className="hidden lg:inline">New Agent</span>
             </Button>
@@ -432,6 +465,79 @@ export default function AgentsPage() {
           </div>
         </div>
       </div>
+
+      {/* New Agent dialog */}
+      <Dialog
+        open={newAgentDialogOpen}
+        onOpenChange={(open) => {
+          setNewAgentDialogOpen(open)
+          if (!open) newAgentForm.reset()
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>New agent</DialogTitle>
+            <DialogDescription>
+              Give your agent a name and a short description of what it does.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Form {...newAgentForm}>
+            <form
+              id="new-agent-form"
+              onSubmit={newAgentForm.handleSubmit(onNewAgentSubmit)}
+              className="flex flex-col gap-4"
+            >
+              <FormField
+                control={newAgentForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. Research Agent" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={newAgentForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Describe what this agent does..."
+                        className="resize-none"
+                        rows={3}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </form>
+          </Form>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setNewAgentDialogOpen(false)
+                newAgentForm.reset()
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" form="new-agent-form">
+              Create agent
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* OTP deletion confirmation dialog */}
       <Dialog
