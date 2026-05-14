@@ -26,7 +26,7 @@ const data = {
   navMain: [
     {
       title: "Dashboard",
-      url: "#",
+      url: "/dashboard",
       icon: (
         <LayoutDashboardIcon
         />
@@ -34,7 +34,7 @@ const data = {
     },
     {
       title: "Lifecycle",
-      url: "#",
+      url: "/dashboard/lifecycle",
       icon: (
         <ListIcon
         />
@@ -42,7 +42,7 @@ const data = {
     },
     {
       title: "Analytics",
-      url: "#",
+      url: "/dashboard/analytics",
       icon: (
         <ChartBarIcon
         />
@@ -50,7 +50,7 @@ const data = {
     },
     {
       title: "Projects",
-      url: "#",
+      url: "/dashboard/projects",
       icon: (
         <FolderIcon
         />
@@ -58,7 +58,7 @@ const data = {
     },
     {
       title: "Team",
-      url: "#",
+      url: "/dashboard/team",
       icon: (
         <UsersIcon
         />
@@ -125,7 +125,7 @@ const data = {
   navSecondary: [
     {
       title: "Settings",
-      url: "#",
+      url: "/dashboard/settings",
       icon: (
         <Settings2Icon
         />
@@ -133,7 +133,7 @@ const data = {
     },
     {
       title: "Get Help",
-      url: "#",
+      url: "/dashboard/help",
       icon: (
         <CircleHelpIcon
         />
@@ -141,7 +141,7 @@ const data = {
     },
     {
       title: "Search",
-      url: "#",
+      url: "/dashboard/search",
       icon: (
         <SearchIcon
         />
@@ -151,7 +151,7 @@ const data = {
   documents: [
     {
       name: "Data Library",
-      url: "#",
+      url: "/dashboard/data-library",
       icon: (
         <DatabaseIcon
         />
@@ -159,7 +159,7 @@ const data = {
     },
     {
       name: "Reports",
-      url: "#",
+      url: "/dashboard/reports",
       icon: (
         <FileChartColumnIcon
         />
@@ -167,7 +167,7 @@ const data = {
     },
     {
       name: "Word Assistant",
-      url: "#",
+      url: "/dashboard/word-assistant",
       icon: (
         <FileIcon
         />
@@ -186,7 +186,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               asChild
               className="data-[slot=sidebar-menu-button]:p-1.5!"
             >
-              <a href="#">
+              <a href="/dashboard">
                 <CommandIcon className="size-5!" />
                 <span className="text-base font-semibold">Acme Inc.</span>
               </a>
