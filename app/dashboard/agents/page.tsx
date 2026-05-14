@@ -25,6 +25,7 @@ import {
   ChevronsRightIcon,
   Columns3Icon,
   EllipsisVerticalIcon,
+  MailIcon,
   PauseIcon,
   PlayIcon,
   PlusIcon,
@@ -38,8 +39,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
@@ -511,42 +510,53 @@ export default function AgentsPage() {
           if (!open) setOtp("")
         }}
       >
-        <DialogContent showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle>Confirm deletion</DialogTitle>
-            <DialogDescription>
-              You are about to permanently delete{" "}
-              <span className="font-medium text-foreground">
-                {table.getFilteredSelectedRowModel().rows.length} agent
-                {table.getFilteredSelectedRowModel().rows.length !== 1 ? "s" : ""}
-              </span>
-              . Enter the 6-digit verification code sent to your email address to
-              confirm.
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent
+          className="max-w-sm gap-0 overflow-hidden p-0"
+          showCloseButton={false}
+        >
+          {/* Header */}
+          <div className="flex flex-col items-center gap-4 border-b px-8 py-8 text-center">
+            <div className="flex size-12 items-center justify-center rounded-full bg-destructive/10">
+              <MailIcon className="size-5 text-destructive" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <DialogTitle>Check your email</DialogTitle>
+              <DialogDescription className="text-sm">
+                We sent a 6-digit code to confirm deleting{" "}
+                <span className="font-medium text-foreground">
+                  {table.getFilteredSelectedRowModel().rows.length} agent
+                  {table.getFilteredSelectedRowModel().rows.length !== 1 ? "s" : ""}
+                </span>
+                .
+              </DialogDescription>
+            </div>
+          </div>
 
-          <div className="flex flex-col items-center gap-4 py-2">
+          {/* OTP input */}
+          <div className="flex flex-col items-center gap-3 px-8 py-8">
             <InputOTP maxLength={6} value={otp} onChange={setOtp}>
               <InputOTPGroup>
-                <InputOTPSlot index={0} />
-                <InputOTPSlot index={1} />
-                <InputOTPSlot index={2} />
+                <InputOTPSlot index={0} className="size-12 text-base" />
+                <InputOTPSlot index={1} className="size-12 text-base" />
+                <InputOTPSlot index={2} className="size-12 text-base" />
               </InputOTPGroup>
               <InputOTPSeparator />
               <InputOTPGroup>
-                <InputOTPSlot index={3} />
-                <InputOTPSlot index={4} />
-                <InputOTPSlot index={5} />
+                <InputOTPSlot index={3} className="size-12 text-base" />
+                <InputOTPSlot index={4} className="size-12 text-base" />
+                <InputOTPSlot index={5} className="size-12 text-base" />
               </InputOTPGroup>
             </InputOTP>
             <p className="text-xs text-muted-foreground">
-              Check your inbox — the code expires in 10 minutes.
+              Expires in 10 minutes.
             </p>
           </div>
 
-          <DialogFooter>
+          {/* Footer */}
+          <div className="flex gap-2 border-t px-8 py-4">
             <Button
               variant="outline"
+              className="flex-1"
               onClick={() => {
                 setDeleteDialogOpen(false)
                 setOtp("")
@@ -554,11 +564,14 @@ export default function AgentsPage() {
             >
               Cancel
             </Button>
-            <Button variant="destructive" disabled={otp.length < 6}>
-              <Trash2Icon />
+            <Button
+              variant="destructive"
+              className="flex-1"
+              disabled={otp.length < 6}
+            >
               Delete agents
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
