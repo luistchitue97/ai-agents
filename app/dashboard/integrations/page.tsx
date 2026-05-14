@@ -1,3 +1,4 @@
+import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,96 +9,84 @@ const integrations = [
     name: "Google Workspace",
     description: "Sync calendars, contacts, Drive files, and Gmail into your workflow.",
     category: "Productivity",
-    color: "bg-blue-500",
-    initials: "GW",
+    icon: "/icons/google.svg",
     connected: true,
   },
   {
     name: "Jira",
     description: "Import issues, sprints, and project boards from Jira automatically.",
     category: "Project Management",
-    color: "bg-blue-600",
-    initials: "JR",
+    icon: "/icons/jira.svg",
     connected: true,
   },
   {
     name: "Slack",
     description: "Send notifications and receive updates directly in your Slack channels.",
     category: "Communication",
-    color: "bg-purple-500",
-    initials: "SL",
+    icon: "/icons/slack.svg",
     connected: false,
   },
   {
     name: "GitHub",
     description: "Link pull requests, issues, and commits to your projects and tasks.",
     category: "Engineering",
-    color: "bg-neutral-800",
-    initials: "GH",
+    icon: "/icons/github.svg",
     connected: false,
   },
   {
     name: "Notion",
     description: "Keep your Notion pages and databases in sync with your workspace.",
     category: "Productivity",
-    color: "bg-neutral-700",
-    initials: "NO",
+    icon: "/icons/notion.svg",
     connected: false,
   },
   {
     name: "Salesforce",
     description: "Pull CRM records, deals, and contacts into your dashboard.",
     category: "CRM",
-    color: "bg-sky-500",
-    initials: "SF",
+    icon: "/icons/salesforce.svg",
     connected: false,
   },
   {
     name: "HubSpot",
     description: "Sync contacts, companies, and pipeline data from HubSpot.",
     category: "CRM",
-    color: "bg-orange-500",
-    initials: "HS",
+    icon: "/icons/hubspot.svg",
     connected: false,
   },
   {
     name: "Linear",
     description: "Surface Linear issues and cycles alongside your project timelines.",
     category: "Project Management",
-    color: "bg-violet-600",
-    initials: "LN",
+    icon: "/icons/linear.svg",
     connected: false,
   },
   {
     name: "Microsoft 365",
     description: "Connect Teams, Outlook, and OneDrive to unify your collaboration.",
     category: "Productivity",
-    color: "bg-indigo-500",
-    initials: "MS",
+    icon: "/icons/microsoft365.svg",
     connected: false,
   },
   {
     name: "Zapier",
     description: "Automate workflows by connecting to thousands of apps via Zapier.",
     category: "Automation",
-    color: "bg-orange-600",
-    initials: "ZP",
+    icon: "/icons/zapier.svg",
     connected: false,
   },
   {
     name: "Asana",
     description: "Bring Asana tasks and timelines into your unified project view.",
     category: "Project Management",
-    color: "bg-pink-500",
-    initials: "AS",
+    icon: "/icons/asana.svg",
     connected: false,
   },
   {
     name: "Stripe",
     description: "Monitor payments, subscriptions, and revenue metrics in real time.",
     category: "Finance",
-    color: "bg-indigo-600",
-    initials: "ST",
+    icon: "/icons/stripe.svg",
     connected: false,
   },
 ]
@@ -152,10 +141,14 @@ function IntegrationCard({
   return (
     <Card className="flex flex-col">
       <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-2">
-        <div
-          className={`flex size-10 shrink-0 items-center justify-center rounded-md text-xs font-bold text-white ${integration.color}`}
-        >
-          {integration.initials}
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-md border bg-white p-1.5 dark:bg-white/5">
+          <Image
+            src={integration.icon}
+            alt={integration.name}
+            width={28}
+            height={28}
+            className="object-contain"
+          />
         </div>
         <div className="flex flex-1 flex-col gap-1 min-w-0">
           <div className="flex items-center gap-2">
