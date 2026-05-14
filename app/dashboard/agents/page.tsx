@@ -35,6 +35,14 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -42,6 +50,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSeparator,
+  InputOTPSlot,
+} from "@/components/ui/input-otp"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -288,6 +302,8 @@ export default function AgentsPage() {
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 10 })
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
+  const [otp, setOtp] = React.useState("")
 
   const table = useReactTable({
     data,
@@ -325,6 +341,7 @@ export default function AgentsPage() {
               variant="destructive"
               size="sm"
               disabled={table.getFilteredSelectedRowModel().rows.length === 0}
+              onClick={() => setDeleteDialogOpen(true)}
             >
               <Trash2Icon />
               <span className="hidden lg:inline">
@@ -485,6 +502,65 @@ export default function AgentsPage() {
           </div>
         </div>
       </div>
+
+      {/* OTP deletion confirmation dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open)
+          if (!open) setOtp("")
+        }}
+      >
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Confirm deletion</DialogTitle>
+            <DialogDescription>
+              You are about to permanently delete{" "}
+              <span className="font-medium text-foreground">
+                {table.getFilteredSelectedRowModel().rows.length} agent
+                {table.getFilteredSelectedRowModel().rows.length !== 1 ? "s" : ""}
+              </span>
+              . Enter the 6-digit verification code sent to your email address to
+              confirm.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col items-center gap-4 py-2">
+            <InputOTP maxLength={6} value={otp} onChange={setOtp}>
+              <InputOTPGroup>
+                <InputOTPSlot index={0} />
+                <InputOTPSlot index={1} />
+                <InputOTPSlot index={2} />
+              </InputOTPGroup>
+              <InputOTPSeparator />
+              <InputOTPGroup>
+                <InputOTPSlot index={3} />
+                <InputOTPSlot index={4} />
+                <InputOTPSlot index={5} />
+              </InputOTPGroup>
+            </InputOTP>
+            <p className="text-xs text-muted-foreground">
+              Check your inbox — the code expires in 10 minutes.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false)
+                setOtp("")
+              }}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" disabled={otp.length < 6}>
+              <Trash2Icon />
+              Delete agents
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
