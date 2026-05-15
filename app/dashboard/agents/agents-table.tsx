@@ -244,7 +244,10 @@ const columns: ColumnDef<Agent>[] = [
 ]
 
 export function AgentsTable({ initialData }: { initialData: Agent[] }) {
-  const [data] = React.useState(initialData)
+  const [data, setData] = React.useState(initialData)
+  React.useEffect(() => {
+    setData(initialData)
+  }, [initialData])
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -277,15 +280,19 @@ export function AgentsTable({ initialData }: { initialData: Agent[] }) {
       setDeleteError("No agents selected.")
       return
     }
+    const selectedSet = new Set(selected)
+    const backup = data
+    setData((prev) => prev.filter((a) => !selectedSet.has(a.id)))
+    setDeleteDialogOpen(false)
+    setConfirmText("")
+    setRowSelection({})
     startDeleteTransition(async () => {
       try {
         const { deleted } = await deleteAgents(selected)
-        setDeleteDialogOpen(false)
-        setConfirmText("")
-        setRowSelection({})
         toast.success(`${deleted} agent${deleted === 1 ? "" : "s"} deleted`)
       } catch (err) {
-        setDeleteError(err instanceof Error ? err.message : "Failed to delete agents.")
+        setData(backup)
+        toast.error(err instanceof Error ? err.message : "Failed to delete agents.")
       }
     })
   }
