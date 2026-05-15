@@ -4,8 +4,7 @@
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -16,6 +15,13 @@ enum AgentStatus {
   active
   idle
   paused
+}
+
+enum LogLevel {
+  info
+  success
+  warning
+  error
 }
 
 model Agent {
@@ -29,4 +35,17 @@ model Agent {
   capabilities   String[]
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
+  logs           Log[]
+}
+
+model Log {
+  id         Int      @id @default(autoincrement())
+  agentId    Int
+  agent      Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  level      LogLevel
+  message    String
+  durationMs Int?
+  createdAt  DateTime @default(now())
+
+  @@index([agentId, createdAt(sort: Desc)])
 }

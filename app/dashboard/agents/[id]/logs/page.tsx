@@ -10,12 +10,20 @@ export default async function AgentLogsPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
+  const agentId = Number(id)
+
   const agent = await prisma.agent.findUnique({
-    where: { id: Number(id) },
+    where: { id: agentId },
     select: { id: true, name: true },
   })
 
   if (!agent) notFound()
 
-  return <AgentLogsView agent={agent} />
+  const logs = await prisma.log.findMany({
+    where: { agentId },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, level: true, message: true, durationMs: true, createdAt: true },
+  })
+
+  return <AgentLogsView agent={agent} logs={logs} />
 }

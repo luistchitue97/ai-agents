@@ -27,26 +27,19 @@ type LogLevel = "info" | "success" | "warning" | "error"
 
 type LogEntry = {
   id: number
-  timestamp: string
   level: LogLevel
   message: string
-  duration?: string
-  date: Date
+  durationMs: number | null
+  createdAt: Date | string
 }
 
-type RawLogEntry = Omit<LogEntry, "date">
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`
+  return `${(ms / 1000).toFixed(1)}s`
+}
 
-function distributeDates(logs: RawLogEntry[]): LogEntry[] {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  return logs.map((log, i) => {
-    const daysAgo = Math.floor(i / 2)
-    const d = new Date(today)
-    d.setDate(d.getDate() - daysAgo)
-    const [h, m, s] = log.timestamp.split(":").map(Number)
-    d.setHours(h, m, s, 0)
-    return { ...log, date: d }
-  })
+function asDate(d: Date | string): Date {
+  return d instanceof Date ? d : new Date(d)
 }
 
 const levelConfig: Record<
@@ -79,86 +72,15 @@ const levelConfig: Record<
   },
 }
 
-function buildLogs(agentId: number): LogEntry[] {
-  const logSets: Record<number, RawLogEntry[]> = {
-    1: [
-      { id: 1, timestamp: "14:23:12", level: "success", message: "Summary generated and delivered to user.", duration: "4.1s" },
-      { id: 2, timestamp: "14:23:08", level: "info", message: "Summarising top 5 results from search." },
-      { id: 3, timestamp: "14:23:05", level: "info", message: "Filtering and ranking results by relevance." },
-      { id: 4, timestamp: "14:23:04", level: "success", message: "Retrieved 12 results from search API.", duration: "3.2s" },
-      { id: 5, timestamp: "14:23:01", level: "info", message: 'Starting web search for "AI trends 2025".' },
-      { id: 6, timestamp: "14:22:44", level: "warning", message: "Rate limit approaching: 8/10 requests used in current window." },
-      { id: 7, timestamp: "14:22:01", level: "error", message: "Connection timeout to search API. Retrying (1/3)." },
-      { id: 8, timestamp: "14:21:58", level: "info", message: "New task received from user." },
-      { id: 9, timestamp: "14:21:00", level: "success", message: "Previous task completed successfully.", duration: "6.8s" },
-      { id: 10, timestamp: "14:20:53", level: "info", message: "Fetching citations for summarised content." },
-      { id: 11, timestamp: "14:20:40", level: "info", message: 'Starting web search for "quantum computing breakthroughs".' },
-      { id: 12, timestamp: "14:19:30", level: "success", message: "Agent initialised and ready.", duration: "0.4s" },
-    ],
-    2: [
-      { id: 1, timestamp: "15:10:45", level: "success", message: "Forecast report exported to Data Library.", duration: "1.2s" },
-      { id: 2, timestamp: "15:10:30", level: "info", message: "Generating 30-day revenue forecast chart." },
-      { id: 3, timestamp: "15:10:12", level: "info", message: "Running linear regression on Q1–Q2 dataset." },
-      { id: 4, timestamp: "15:09:58", level: "success", message: "SQL query executed: 4,821 rows returned.", duration: "0.9s" },
-      { id: 5, timestamp: "15:09:55", level: "info", message: "Connecting to primary data warehouse." },
-      { id: 6, timestamp: "15:08:20", level: "warning", message: "Dataset contains 3 null values in 'revenue' column. Interpolating." },
-      { id: 7, timestamp: "15:07:44", level: "error", message: "Query timeout after 30s. Optimising and retrying." },
-      { id: 8, timestamp: "15:07:40", level: "info", message: "Received analysis request: monthly sales breakdown." },
-      { id: 9, timestamp: "15:06:00", level: "success", message: "Pivot table generated for regional performance.", duration: "2.3s" },
-      { id: 10, timestamp: "15:05:10", level: "info", message: "Agent initialised and ready.", },
-    ],
-    3: [
-      { id: 1, timestamp: "11:45:02", level: "success", message: "Review comment posted on PR #312.", duration: "0.3s" },
-      { id: 2, timestamp: "11:44:50", level: "warning", message: "Potential SQL injection risk detected in src/api/users.ts:48." },
-      { id: 3, timestamp: "11:44:35", level: "info", message: "Scanning 6 changed files in PR #312." },
-      { id: 4, timestamp: "11:44:30", level: "info", message: "Received review request for PR #312: 'Add user auth endpoint'." },
-      { id: 5, timestamp: "11:30:15", level: "success", message: "Style suggestions applied — 4 issues resolved.", duration: "0.2s" },
-      { id: 6, timestamp: "11:30:10", level: "info", message: "Checking code style against ESLint ruleset." },
-      { id: 7, timestamp: "11:30:05", level: "error", message: "Unhandled promise rejection found in src/jobs/sync.ts:102." },
-      { id: 8, timestamp: "11:29:50", level: "info", message: "Scanning diff for PR #311." },
-      { id: 9, timestamp: "11:00:00", level: "success", message: "Agent initialised and ready.", duration: "0.5s" },
-    ],
-    4: [
-      { id: 1, timestamp: "16:02:10", level: "success", message: "Reply drafted and queued for review.", duration: "1.8s" },
-      { id: 2, timestamp: "16:02:05", level: "info", message: "Composing response for ticket #8841." },
-      { id: 3, timestamp: "16:01:58", level: "info", message: "Matched ticket #8841 to FAQ: billing cycle questions." },
-      { id: 4, timestamp: "16:01:55", level: "info", message: "New ticket received: 'Subscription charge question'." },
-      { id: 5, timestamp: "16:00:40", level: "warning", message: "Ticket #8839 escalated — sentiment score below threshold (0.21)." },
-      { id: 6, timestamp: "16:00:20", level: "success", message: "Ticket #8838 resolved and closed.", duration: "3.4s" },
-      { id: 7, timestamp: "15:59:50", level: "info", message: "Routing ticket #8837 to billing team." },
-      { id: 8, timestamp: "15:59:30", level: "error", message: "CRM API returned 503. Ticket #8836 queued for retry." },
-      { id: 9, timestamp: "15:58:00", level: "info", message: "Processing 5 queued tickets." },
-      { id: 10, timestamp: "15:55:00", level: "success", message: "Agent initialised and ready.", duration: "0.6s" },
-    ],
-    5: [
-      { id: 1, timestamp: "09:15:30", level: "info", message: "Agent paused by user." },
-      { id: 2, timestamp: "09:15:20", level: "success", message: "Blog post draft saved to Word Assistant.", duration: "0.7s" },
-      { id: 3, timestamp: "09:15:00", level: "info", message: "Refining tone and SEO keywords in draft." },
-      { id: 4, timestamp: "09:14:30", level: "info", message: "Generating outline for 'Top 10 SaaS Trends 2025'." },
-      { id: 5, timestamp: "09:14:00", level: "warning", message: "Brief is vague — proceeding with inferred context." },
-      { id: 6, timestamp: "09:13:55", level: "info", message: "Received content brief from user." },
-      { id: 7, timestamp: "09:00:00", level: "success", message: "Agent initialised and ready.", duration: "0.4s" },
-    ],
-    6: [
-      { id: 1, timestamp: "08:30:05", level: "info", message: "Agent paused by user." },
-      { id: 2, timestamp: "08:30:00", level: "success", message: "Draft reply sent to Drafts folder.", duration: "0.5s" },
-      { id: 3, timestamp: "08:29:45", level: "info", message: "Drafting reply to Sarah (Re: Q3 Budget Review)." },
-      { id: 4, timestamp: "08:29:30", level: "warning", message: "3 emails flagged as high priority and surfaced for review." },
-      { id: 5, timestamp: "08:29:00", level: "info", message: "Scanning inbox: 14 new messages." },
-      { id: 6, timestamp: "08:28:50", level: "error", message: "OAuth token expired. Re-authenticating with mail provider." },
-      { id: 7, timestamp: "08:28:40", level: "info", message: "Connecting to mail provider." },
-      { id: 8, timestamp: "08:00:00", level: "success", message: "Agent initialised and ready.", duration: "0.3s" },
-    ],
-  }
-
-  return distributeDates(logSets[agentId] ?? logSets[1])
-}
-
 const LEVELS: Array<LogLevel | "all"> = ["all", "info", "success", "warning", "error"]
 
-export function AgentLogsView({ agent }: { agent: { id: number; name: string } }) {
-  const allLogs = React.useMemo(() => buildLogs(agent.id), [agent.id])
-
+export function AgentLogsView({
+  agent,
+  logs: allLogs,
+}: {
+  agent: { id: number; name: string }
+  logs: LogEntry[]
+}) {
   const [levelFilter, setLevelFilter] = React.useState<LogLevel | "all">("all")
   const [search, setSearch] = React.useState("")
   const [dateRange, setDateRange] = React.useState<DateRange | undefined>(undefined)
@@ -167,15 +89,16 @@ export function AgentLogsView({ agent }: { agent: { id: number; name: string } }
     const matchesLevel = levelFilter === "all" || log.level === levelFilter
     const matchesSearch = log.message.toLowerCase().includes(search.toLowerCase())
     let matchesDate = true
+    const logDate = asDate(log.createdAt)
     if (dateRange?.from) {
       const start = new Date(dateRange.from)
       start.setHours(0, 0, 0, 0)
-      matchesDate = log.date >= start
+      matchesDate = logDate >= start
     }
     if (matchesDate && dateRange?.to) {
       const end = new Date(dateRange.to)
       end.setHours(23, 59, 59, 999)
-      matchesDate = log.date <= end
+      matchesDate = logDate <= end
     }
     return matchesLevel && matchesSearch && matchesDate
   })
@@ -328,7 +251,7 @@ export function AgentLogsView({ agent }: { agent: { id: number; name: string } }
                     className={`flex items-start gap-4 border-l-2 px-4 py-3 ${cfg.rowClass}`}
                   >
                     <span className="mt-0.5 shrink-0 font-mono text-xs text-muted-foreground">
-                      {log.timestamp}
+                      {format(asDate(log.createdAt), "HH:mm:ss")}
                     </span>
                     <Badge
                       variant="outline"
@@ -340,9 +263,9 @@ export function AgentLogsView({ agent }: { agent: { id: number; name: string } }
                     <span className="flex-1 text-sm leading-relaxed">
                       {log.message}
                     </span>
-                    {log.duration && (
+                    {log.durationMs !== null && (
                       <span className="shrink-0 font-mono text-xs text-muted-foreground">
-                        {log.duration}
+                        {formatDuration(log.durationMs)}
                       </span>
                     )}
                   </div>
