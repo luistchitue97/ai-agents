@@ -29,6 +29,7 @@ export async function listAgents() {
 const newAgentSchema = z.object({
   name: z.string().min(2).max(50),
   description: z.string().min(10).max(200),
+  capabilities: z.array(z.string().min(1).max(40)).max(3).optional(),
 })
 
 export async function createAgent(input: z.infer<typeof newAgentSchema>) {
@@ -54,7 +55,7 @@ export async function createAgent(input: z.infer<typeof newAgentSchema>) {
         nameKey,
         description: data.description,
         model: "Claude Sonnet 4.6",
-        capabilities: [],
+        capabilities: data.capabilities ?? [],
       },
     })
     revalidatePath("/dashboard/agents")

@@ -32,6 +32,7 @@ import {
   PauseIcon,
   PlayIcon,
   PlusIcon,
+  XIcon,
   Trash2Icon,
 } from "lucide-react"
 
@@ -92,6 +93,9 @@ import { type Agent, type AgentStatus } from "./data"
 const newAgentSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").max(50, "Name must be 50 characters or fewer"),
   description: z.string().min(10, "Description must be at least 10 characters").max(200, "Description must be 200 characters or fewer"),
+  capabilities: z
+    .array(z.string().min(1).max(40, "Each capability must be 40 characters or fewer"))
+    .max(3, "Up to 3 capabilities"),
 })
 
 const statusConfig: Record<AgentStatus, { label: string; className: string }> = {
@@ -257,6 +261,7 @@ export function AgentsTable({ initialData }: { initialData: Agent[] }) {
   const [confirmText, setConfirmText] = React.useState("")
   const [deleteError, setDeleteError] = React.useState<string | null>(null)
   const [newAgentDialogOpen, setNewAgentDialogOpen] = React.useState(false)
+  const [capInput, setCapInput] = React.useState("")
 
   function deleteConfirmPhrase(count: number): string {
     return count === 1
@@ -266,7 +271,7 @@ export function AgentsTable({ initialData }: { initialData: Agent[] }) {
 
   const newAgentForm = useForm<z.infer<typeof newAgentSchema>>({
     resolver: zodResolver(newAgentSchema),
-    defaultValues: { name: "", description: "" },
+    defaultValues: { name: "", description: "", capabilities: [] },
   })
 
   const router = useRouter()
@@ -303,6 +308,7 @@ export function AgentsTable({ initialData }: { initialData: Agent[] }) {
         const agent = await createAgent(values)
         setNewAgentDialogOpen(false)
         newAgentForm.reset()
+        setCapInput("")
         toast.success(`${agent.name} created`, {
           description: "Configure your new agent below.",
         })
@@ -518,7 +524,10 @@ export function AgentsTable({ initialData }: { initialData: Agent[] }) {
         open={newAgentDialogOpen}
         onOpenChange={(open) => {
           setNewAgentDialogOpen(open)
-          if (!open) newAgentForm.reset()
+          if (!open) {
+            newAgentForm.reset()
+            setCapInput("")
+          }
         }}
       >
         <DialogContent className="max-w-md">
@@ -566,6 +575,72 @@ export function AgentsTable({ initialData }: { initialData: Agent[] }) {
                   </FormItem>
                 )}
               />
+              <FormField
+                control={newAgentForm.control}
+                name="capabilities"
+                render={({ field }) => {
+                  const tags = field.value ?? []
+                  const addTag = (raw: string) => {
+                    const t = raw.trim()
+                    if (!t || tags.includes(t) || tags.length >= 3) return
+                    field.onChange([...tags, t])
+                  }
+                  const removeTag = (idx: number) => {
+                    field.onChange(tags.filter((_, i) => i !== idx))
+                  }
+                  return (
+                    <FormItem>
+                      <FormLabel>Capabilities</FormLabel>
+                      <FormControl>
+                        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-input bg-transparent px-2 py-1.5 text-sm focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
+                          {tags.map((tag, idx) => (
+                            <Badge
+                              key={`${tag}-${idx}`}
+                              variant="secondary"
+                              className="gap-1 px-2 py-0.5 text-xs"
+                            >
+                              {tag}
+                              <button
+                                type="button"
+                                aria-label={`Remove ${tag}`}
+                                onClick={() => removeTag(idx)}
+                                className="-mr-0.5 rounded-sm opacity-60 hover:opacity-100"
+                              >
+                                <XIcon className="size-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                          <input
+                            value={capInput}
+                            onChange={(e) => setCapInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === ",") {
+                                e.preventDefault()
+                                addTag(capInput)
+                                setCapInput("")
+                              } else if (e.key === "Backspace" && !capInput && tags.length > 0) {
+                                removeTag(tags.length - 1)
+                              }
+                            }}
+                            onBlur={() => {
+                              if (capInput.trim()) {
+                                addTag(capInput)
+                                setCapInput("")
+                              }
+                            }}
+                            placeholder={tags.length === 0 ? "e.g. Web search, SQL, Summarisation" : ""}
+                            className="min-w-[8ch] flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                          />
+                        </div>
+                      </FormControl>
+                      <p className="text-muted-foreground text-xs">
+                        Press Enter or comma to add. {tags.length}/3.
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )
+                }}
+              />
               {newAgentForm.formState.errors.root && (
                 <p className="text-destructive text-sm">
                   {newAgentForm.formState.errors.root.message}
@@ -580,6 +655,7 @@ export function AgentsTable({ initialData }: { initialData: Agent[] }) {
               onClick={() => {
                 setNewAgentDialogOpen(false)
                 newAgentForm.reset()
+                setCapInput("")
               }}
               disabled={isCreating}
             >
