@@ -7,6 +7,18 @@ import { z } from "zod"
 import { prisma } from "@/lib/prisma"
 import { normalizeAgentName } from "./data"
 
+export async function deleteAgents(ids: number[]) {
+  const validIds = ids.filter((id) => Number.isInteger(id) && id > 0)
+  if (validIds.length === 0) {
+    throw new Error("No valid agents selected.")
+  }
+  const result = await prisma.agent.deleteMany({
+    where: { id: { in: validIds } },
+  })
+  revalidatePath("/dashboard/agents")
+  return { deleted: result.count }
+}
+
 export async function listAgents() {
   return prisma.agent.findMany({
     select: { id: true, name: true, description: true, status: true, model: true },
