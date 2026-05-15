@@ -3,9 +3,12 @@
 import * as React from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
+import { format } from "date-fns"
+import type { DateRange } from "react-day-picker"
 import {
   ArrowLeftIcon,
   BotIcon,
+  CalendarIcon,
   CircleAlertIcon,
   CircleCheckIcon,
   CircleXIcon,
@@ -16,7 +19,10 @@ import {
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Calendar } from "@/components/ui/calendar"
 import { Input } from "@/components/ui/input"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
 import { agentsData } from "../../data"
 
 type LogLevel = "info" | "success" | "warning" | "error"
@@ -27,6 +33,22 @@ type LogEntry = {
   level: LogLevel
   message: string
   duration?: string
+  date: Date
+}
+
+type RawLogEntry = Omit<LogEntry, "date">
+
+function distributeDates(logs: RawLogEntry[]): LogEntry[] {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return logs.map((log, i) => {
+    const daysAgo = Math.floor(i / 2)
+    const d = new Date(today)
+    d.setDate(d.getDate() - daysAgo)
+    const [h, m, s] = log.timestamp.split(":").map(Number)
+    d.setHours(h, m, s, 0)
+    return { ...log, date: d }
+  })
 }
 
 const levelConfig: Record<
@@ -60,7 +82,7 @@ const levelConfig: Record<
 }
 
 function buildLogs(agentId: number): LogEntry[] {
-  const logSets: Record<number, LogEntry[]> = {
+  const logSets: Record<number, RawLogEntry[]> = {
     1: [
       { id: 1, timestamp: "14:23:12", level: "success", message: "Summary generated and delivered to user.", duration: "4.1s" },
       { id: 2, timestamp: "14:23:08", level: "info", message: "Summarising top 5 results from search." },
@@ -131,7 +153,7 @@ function buildLogs(agentId: number): LogEntry[] {
     ],
   }
 
-  return logSets[agentId] ?? logSets[1]
+  return distributeDates(logSets[agentId] ?? logSets[1])
 }
 
 const LEVELS: Array<LogLevel | "all"> = ["all", "info", "success", "warning", "error"]
@@ -143,11 +165,23 @@ export default function AgentLogsPage() {
 
   const [levelFilter, setLevelFilter] = React.useState<LogLevel | "all">("all")
   const [search, setSearch] = React.useState("")
+  const [dateRange, setDateRange] = React.useState<DateRange | undefined>(undefined)
 
   const filtered = allLogs.filter((log) => {
     const matchesLevel = levelFilter === "all" || log.level === levelFilter
     const matchesSearch = log.message.toLowerCase().includes(search.toLowerCase())
-    return matchesLevel && matchesSearch
+    let matchesDate = true
+    if (dateRange?.from) {
+      const start = new Date(dateRange.from)
+      start.setHours(0, 0, 0, 0)
+      matchesDate = log.date >= start
+    }
+    if (matchesDate && dateRange?.to) {
+      const end = new Date(dateRange.to)
+      end.setHours(23, 59, 59, 999)
+      matchesDate = log.date <= end
+    }
+    return matchesLevel && matchesSearch && matchesDate
   })
 
   const countByLevel = (level: LogLevel) => allLogs.filter((l) => l.level === level).length
@@ -221,15 +255,64 @@ export default function AgentLogsPage() {
             })}
           </div>
 
-          {/* Search */}
-          <div className="relative w-full sm:w-64">
-            <SearchIcon className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search logs..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 text-sm h-8"
-            />
+          {/* Date range + Search */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={cn(
+                    "h-8 justify-start gap-2 text-xs font-normal",
+                    !dateRange && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="size-3.5" />
+                  {dateRange?.from ? (
+                    dateRange.to ? (
+                      <>
+                        {format(dateRange.from, "MMM d")} – {format(dateRange.to, "MMM d, yyyy")}
+                      </>
+                    ) : (
+                      format(dateRange.from, "MMM d, yyyy")
+                    )
+                  ) : (
+                    "Pick a date range"
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <div className="flex items-center justify-between border-b px-3 py-2">
+                  <span className="text-xs font-medium">Filter by date</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => setDateRange(undefined)}
+                    disabled={!dateRange}
+                  >
+                    Clear
+                  </Button>
+                </div>
+                <Calendar
+                  mode="range"
+                  selected={dateRange}
+                  onSelect={setDateRange}
+                  numberOfMonths={2}
+                  defaultMonth={dateRange?.from}
+                />
+              </PopoverContent>
+            </Popover>
+
+            <div className="relative w-full sm:w-64">
+              <SearchIcon className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search logs..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8 text-sm h-8"
+              />
+            </div>
           </div>
         </div>
 
