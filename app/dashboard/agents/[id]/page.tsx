@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
+import { withAuth } from "@workos-inc/authkit-nextjs"
 import {
   ActivityIcon,
   ArrowLeftIcon,
@@ -47,7 +48,12 @@ export default async function AgentConfigPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const row = await prisma.agent.findUnique({ where: { id: Number(id) } })
+  const { organizationId } = await withAuth({ ensureSignedIn: true })
+  const row = organizationId
+    ? await prisma.agent.findFirst({
+        where: { id: Number(id), organizationId },
+      })
+    : null
 
   if (!row) notFound()
 

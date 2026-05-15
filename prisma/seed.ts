@@ -167,12 +167,14 @@ async function main() {
   await prisma.log.deleteMany()
   await prisma.agent.deleteMany()
 
+  const orgId = process.env.SEED_ORG_ID ?? "local-dev"
   let totalLogs = 0
   for (const a of agents) {
     const { logs, ...agentData } = a
     const created = await prisma.agent.create({
       data: {
         ...agentData,
+        organizationId: orgId,
         nameKey: agentData.name.toLowerCase().replace(/\s+/g, ""),
       },
     })

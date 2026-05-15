@@ -1,10 +1,18 @@
+import { withAuth } from "@workos-inc/authkit-nextjs"
+
 import { prisma } from "@/lib/prisma"
 
 import { AgentsTable } from "./agents-table"
 import { formatLastActive, type Agent } from "./data"
 
 export default async function AgentsPage() {
-  const rows = await prisma.agent.findMany({ orderBy: { id: "asc" } })
+  const { organizationId } = await withAuth({ ensureSignedIn: true })
+  const rows = organizationId
+    ? await prisma.agent.findMany({
+        where: { organizationId },
+        orderBy: { id: "asc" },
+      })
+    : []
   const agents: Agent[] = rows.map((a) => ({
     id: a.id,
     name: a.name,

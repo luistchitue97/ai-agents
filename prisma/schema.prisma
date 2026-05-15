@@ -26,8 +26,9 @@ enum LogLevel {
 
 model Agent {
   id             Int         @id @default(autoincrement())
+  organizationId String
   name           String
-  nameKey        String      @unique
+  nameKey        String
   description    String
   model          String
   status         AgentStatus @default(idle)
@@ -37,6 +38,9 @@ model Agent {
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
   logs           Log[]
+
+  @@unique([organizationId, nameKey])
+  @@index([organizationId])
 }
 
 model Log {

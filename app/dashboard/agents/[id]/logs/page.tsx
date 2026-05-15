@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation"
+import { withAuth } from "@workos-inc/authkit-nextjs"
 
 import { prisma } from "@/lib/prisma"
 
@@ -11,11 +12,14 @@ export default async function AgentLogsPage({
 }) {
   const { id } = await params
   const agentId = Number(id)
+  const { organizationId } = await withAuth({ ensureSignedIn: true })
 
-  const agent = await prisma.agent.findUnique({
-    where: { id: agentId },
-    select: { id: true, name: true },
-  })
+  const agent = organizationId
+    ? await prisma.agent.findFirst({
+        where: { id: agentId, organizationId },
+        select: { id: true, name: true },
+      })
+    : null
 
   if (!agent) notFound()
 
