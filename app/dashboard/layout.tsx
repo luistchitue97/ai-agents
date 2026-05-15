@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation"
 import { withAuth } from "@workos-inc/authkit-nextjs"
 
 import { AppSidebar } from "@/components/app-sidebar"
@@ -11,7 +12,9 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { user } = await withAuth({ ensureSignedIn: true })
+  const { user, organizationId } = await withAuth({ ensureSignedIn: true })
+
+  if (!organizationId) redirect("/onboarding/organization")
 
   const displayName =
     [user.firstName, user.lastName].filter(Boolean).join(" ") ||
