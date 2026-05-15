@@ -31,7 +31,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
-import { agentsData, MODELS, type AgentStatus } from "../data"
+import { prisma } from "@/lib/prisma"
+
+import { formatLastActive, MODELS, type AgentStatus } from "../data"
 
 const statusConfig: Record<AgentStatus, { label: string; className: string }> = {
   active: { label: "Active", className: "bg-green-500/10 text-green-600 border-green-500/20" },
@@ -45,9 +47,14 @@ export default async function AgentConfigPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const agent = agentsData.find((a) => a.id === Number(id))
+  const row = await prisma.agent.findUnique({ where: { id: Number(id) } })
 
-  if (!agent) notFound()
+  if (!row) notFound()
+
+  const agent = {
+    ...row,
+    lastActive: formatLastActive(row.lastActive),
+  }
 
   const status = statusConfig[agent.status]
 
