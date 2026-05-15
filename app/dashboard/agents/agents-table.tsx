@@ -2,6 +2,8 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import {
   flexRender,
   getCoreRowModel,
@@ -263,14 +265,19 @@ export function AgentsTable({ initialData }: { initialData: Agent[] }) {
     defaultValues: { name: "", description: "" },
   })
 
+  const router = useRouter()
   const [isCreating, startCreateTransition] = React.useTransition()
 
   function onNewAgentSubmit(values: z.infer<typeof newAgentSchema>) {
     startCreateTransition(async () => {
       try {
-        await createAgent(values)
+        const agent = await createAgent(values)
         setNewAgentDialogOpen(false)
         newAgentForm.reset()
+        toast.success(`${agent.name} created`, {
+          description: "Configure your new agent below.",
+        })
+        router.push(`/dashboard/agents/${agent.id}`)
       } catch (err) {
         newAgentForm.setError("root", {
           message: err instanceof Error ? err.message : "Failed to create agent.",

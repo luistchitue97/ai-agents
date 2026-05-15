@@ -2,6 +2,7 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { CommandMenu } from "@/components/command-menu"
 import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { Toaster } from "@/components/ui/sonner"
 
 export default function DashboardLayout({
   children,
@@ -19,6 +20,7 @@ export default function DashboardLayout({
     >
       <AppSidebar variant="inset" />
       <CommandMenu />
+      <Toaster position="top-center" />
       <SidebarInset>
         <SiteHeader />
         <div className="flex flex-1 flex-col">
