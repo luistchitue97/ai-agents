@@ -170,7 +170,12 @@ async function main() {
   let totalLogs = 0
   for (const a of agents) {
     const { logs, ...agentData } = a
-    const created = await prisma.agent.create({ data: agentData })
+    const created = await prisma.agent.create({
+      data: {
+        ...agentData,
+        nameKey: agentData.name.toLowerCase().replace(/\s+/g, ""),
+      },
+    })
     if (logs.length > 0) {
       await prisma.log.createMany({
         data: logs.map((l) => ({

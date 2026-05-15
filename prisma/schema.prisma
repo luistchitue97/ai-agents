@@ -27,6 +27,7 @@ enum LogLevel {
 model Agent {
   id             Int         @id @default(autoincrement())
   name           String
+  nameKey        String      @unique
   description    String
   model          String
   status         AgentStatus @default(idle)

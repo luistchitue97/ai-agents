@@ -17,6 +17,11 @@ export const MODELS = [
   "Claude Haiku 4.5",
 ] as const
 
+/** Normalize an agent name for uniqueness comparison: lowercase + strip whitespace. */
+export function normalizeAgentName(name: string): string {
+  return name.toLowerCase().replace(/\s+/g, "")
+}
+
 export function formatLastActive(date: Date): string {
   const diffSec = Math.floor((Date.now() - date.getTime()) / 1000)
   if (diffSec < 60) return "Just now"
