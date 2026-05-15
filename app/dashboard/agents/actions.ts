@@ -5,6 +5,13 @@ import { z } from "zod"
 
 import { prisma } from "@/lib/prisma"
 
+export async function listAgents() {
+  return prisma.agent.findMany({
+    select: { id: true, name: true, description: true, status: true, model: true },
+    orderBy: { name: "asc" },
+  })
+}
+
 const newAgentSchema = z.object({
   name: z.string().min(2).max(50),
   description: z.string().min(10).max(200),
