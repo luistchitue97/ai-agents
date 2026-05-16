@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation"
 import { withAuth } from "@workos-inc/authkit-nextjs"
 import { BotIcon } from "lucide-react"
 
@@ -14,9 +13,7 @@ import { CreateOrganizationForm } from "./create-organization-form"
 
 export default async function CreateOrganizationPage() {
   const { user, organizationId } = await withAuth({ ensureSignedIn: true })
-
-  // Already in an org — bypass onboarding.
-  if (organizationId) redirect("/dashboard")
+  const hasExistingOrg = Boolean(organizationId)
 
   return (
     <div className="flex min-h-svh items-center justify-center bg-muted/30 px-4 py-12">
@@ -26,10 +23,12 @@ export default async function CreateOrganizationPage() {
             <BotIcon className="size-5 text-primary" />
           </div>
           <div className="flex flex-col gap-1">
-            <CardTitle>Create your organization</CardTitle>
+            <CardTitle>
+              {hasExistingOrg ? "Create a new organization" : "Create your organization"}
+            </CardTitle>
             <CardDescription>
-              You'll be the admin. Invite teammates and configure SSO from
-              settings once you're in.
+              You'll be the admin. Invite teammates and configure SSO from the
+              Team page once you're in.
             </CardDescription>
           </div>
         </CardHeader>

@@ -6,16 +6,14 @@ import { NavDocuments } from "@/components/nav-documents"
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
+import { OrgSwitcher, type OrgOption } from "@/components/org-switcher"
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { LayoutDashboardIcon, ListIcon, ChartBarIcon, FolderIcon, BotIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, PlugZapIcon, UsersIcon } from "lucide-react"
+import { LayoutDashboardIcon, ListIcon, ChartBarIcon, FolderIcon, BotIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, PlugZapIcon, UsersIcon } from "lucide-react"
 
 const data = {
   user: {
@@ -196,24 +194,20 @@ type SidebarUser = { name: string; email: string; avatar: string }
 
 export function AppSidebar({
   user,
+  organizations,
+  currentOrgId,
   ...props
-}: React.ComponentProps<typeof Sidebar> & { user?: SidebarUser }) {
+}: React.ComponentProps<typeof Sidebar> & {
+  user?: SidebarUser
+  organizations?: OrgOption[]
+  currentOrgId?: string
+}) {
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              className="data-[slot=sidebar-menu-button]:p-1.5!"
-            >
-              <a href="/dashboard">
-                <CommandIcon className="size-5!" />
-                <span className="text-base font-semibold">Acme Inc.</span>
-              </a>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        {organizations && currentOrgId && (
+          <OrgSwitcher organizations={organizations} currentOrgId={currentOrgId} />
+        )}
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />

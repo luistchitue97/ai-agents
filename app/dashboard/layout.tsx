@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
-import { withAuth } from "@workos-inc/authkit-nextjs"
+import { getWorkOS, withAuth } from "@workos-inc/authkit-nextjs"
 
 import { AppSidebar } from "@/components/app-sidebar"
 import { CommandMenu } from "@/components/command-menu"
@@ -20,6 +20,16 @@ export default async function DashboardLayout({
     [user.firstName, user.lastName].filter(Boolean).join(" ") ||
     user.email.split("@")[0]
 
+  const workos = getWorkOS()
+  const memberships = await workos.userManagement.listOrganizationMemberships({
+    userId: user.id,
+    statuses: ["active"],
+    limit: 100,
+  })
+  const organizations = memberships.data
+    .map((m) => ({ id: m.organizationId, name: m.organizationName }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+
   return (
     <SidebarProvider
       style={
@@ -36,6 +46,8 @@ export default async function DashboardLayout({
           email: user.email,
           avatar: user.profilePictureUrl ?? "",
         }}
+        organizations={organizations}
+        currentOrgId={organizationId}
       />
       <CommandMenu />
       <Toaster position="top-center" />
