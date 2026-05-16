@@ -72,6 +72,12 @@ const actionMeta: Record<string, ActionMeta> = {
     tone: "destructive",
     kind: "delete",
   },
+  "agent.configured": {
+    label: "Configured agent",
+    icon: <BotIcon className="size-3.5" />,
+    tone: "secondary",
+    kind: "update",
+  },
   "integration.connected": {
     label: "Connected integration",
     icon: <PlugZapIcon className="size-3.5" />,

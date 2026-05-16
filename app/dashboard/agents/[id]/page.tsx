@@ -32,9 +32,11 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import { integrationProviders } from "@/lib/integrations/providers"
 import { prisma } from "@/lib/prisma"
 
 import { formatLastActive, MODELS, type AgentStatus } from "../data"
+import { ToolsCard, type ToolOption } from "./tools-card"
 
 const statusConfig: Record<AgentStatus, { label: string; className: string }> = {
   active: { label: "Active", className: "bg-green-500/10 text-green-600 border-green-500/20" },
@@ -48,10 +50,15 @@ export default async function AgentConfigPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const { organizationId } = await withAuth({ ensureSignedIn: true })
+  const { organizationId, role } = await withAuth({ ensureSignedIn: true })
+  const isAdmin = role === "admin"
+
   const row = organizationId
     ? await prisma.agent.findFirst({
         where: { id: Number(id), organizationId },
+        include: {
+          connections: { select: { integrationConnectionId: true } },
+        },
       })
     : null
 
@@ -63,6 +70,34 @@ export default async function AgentConfigPage({
   }
 
   const status = statusConfig[agent.status]
+
+  // All org-level integration connections — these are the options the agent can be wired to.
+  const allConnections = organizationId
+    ? await prisma.integrationConnection.findMany({
+        where: { organizationId },
+        select: {
+          id: true,
+          providerId: true,
+          accountLogin: true,
+          accountName: true,
+        },
+        orderBy: { createdAt: "asc" },
+      })
+    : []
+
+  const toolOptions: ToolOption[] = allConnections.map((c) => {
+    const provider = integrationProviders[c.providerId]
+    return {
+      connectionId: c.id,
+      providerId: c.providerId,
+      providerName: provider?.name ?? c.providerId,
+      iconPath: provider?.iconPath ?? "/icons/plug.svg",
+      accountLabel:
+        c.accountLogin ?? c.accountName ?? "Connected",
+    }
+  })
+
+  const initialSelected = row.connections.map((c) => c.integrationConnectionId)
 
   return (
     <div className="@container/main flex flex-1 flex-col gap-2">
@@ -193,6 +228,14 @@ export default async function AgentConfigPage({
                 </Button>
               </CardContent>
             </Card>
+
+            {/* Tools */}
+            <ToolsCard
+              agentId={agent.id}
+              options={toolOptions}
+              initialSelected={initialSelected}
+              isAdmin={isAdmin}
+            />
 
           </div>
 

@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma"
 export type AuditAction =
   | "agent.created"
   | "agent.deleted"
+  | "agent.configured"
   | "integration.connected"
   | "integration.disconnected"
   | "member.invited"

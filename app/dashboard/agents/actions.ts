@@ -103,3 +103,61 @@ export async function createAgent(input: z.infer<typeof newAgentSchema>) {
     throw err
   }
 }
+
+const setAgentConnectionsSchema = z.object({
+  agentId: z.number().int().positive(),
+  connectionIds: z.array(z.string().min(1)).max(50),
+})
+
+/**
+ * Replaces the full set of integration connections linked to an agent.
+ * Admin-only. All connection IDs must belong to the caller's organization,
+ * and the agent must also belong to that organization.
+ */
+export async function setAgentConnections(
+  input: z.infer<typeof setAgentConnectionsSchema>
+) {
+  const { agentId, connectionIds } = setAgentConnectionsSchema.parse(input)
+  const { organizationId } = await requireAdminContext()
+
+  // Validate the agent belongs to this org.
+  const agent = await prisma.agent.findFirst({
+    where: { id: agentId, organizationId },
+    select: { id: true, name: true },
+  })
+  if (!agent) throw new Error("Agent not found in this organization.")
+
+  // Validate every connection ID also belongs to this org.
+  const valid = await prisma.integrationConnection.findMany({
+    where: { id: { in: connectionIds }, organizationId },
+    select: { id: true },
+  })
+  if (valid.length !== connectionIds.length) {
+    throw new Error("One or more integrations don't belong to this organization.")
+  }
+
+  await prisma.$transaction([
+    prisma.agentConnection.deleteMany({ where: { agentId } }),
+    ...(connectionIds.length > 0
+      ? [
+          prisma.agentConnection.createMany({
+            data: connectionIds.map((id) => ({
+              agentId,
+              integrationConnectionId: id,
+            })),
+          }),
+        ]
+      : []),
+  ])
+
+  await logAudit({
+    action: "agent.configured",
+    targetType: "agent",
+    targetId: String(agent.id),
+    targetLabel: agent.name,
+    metadata: { connectionIds },
+  })
+
+  revalidatePath(`/dashboard/agents/${agent.id}`)
+  return { connected: connectionIds.length }
+}

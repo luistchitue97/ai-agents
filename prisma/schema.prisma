@@ -38,6 +38,7 @@ model Agent {
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
   logs           Log[]
+  connections    AgentConnection[]
 
   @@unique([organizationId, nameKey])
   @@index([organizationId])
@@ -56,9 +57,21 @@ model IntegrationConnection {
   accountName     String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+  agentConnections AgentConnection[]
 
   @@unique([organizationId, providerId, accountId])
   @@index([organizationId])
+}
+
+model AgentConnection {
+  agentId                 Int
+  integrationConnectionId String
+  createdAt               DateTime @default(now())
+  agent                   Agent                 @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  connection              IntegrationConnection @relation(fields: [integrationConnectionId], references: [id], onDelete: Cascade)
+
+  @@id([agentId, integrationConnectionId])
+  @@index([integrationConnectionId])
 }
 
 model Log {
