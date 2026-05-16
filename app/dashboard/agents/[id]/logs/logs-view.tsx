@@ -8,6 +8,10 @@ import {
   ArrowLeftIcon,
   BotIcon,
   CalendarIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ChevronsLeftIcon,
+  ChevronsRightIcon,
   CircleAlertIcon,
   CircleCheckIcon,
   CircleXIcon,
@@ -74,6 +78,8 @@ const levelConfig: Record<
 
 const LEVELS: Array<LogLevel | "all"> = ["all", "info", "success", "warning", "error"]
 
+const PAGE_SIZE = 10
+
 export function AgentLogsView({
   agent,
   logs: allLogs,
@@ -84,6 +90,11 @@ export function AgentLogsView({
   const [levelFilter, setLevelFilter] = React.useState<LogLevel | "all">("all")
   const [search, setSearch] = React.useState("")
   const [dateRange, setDateRange] = React.useState<DateRange | undefined>(undefined)
+  const [pageIndex, setPageIndex] = React.useState(0)
+
+  React.useEffect(() => {
+    setPageIndex(0)
+  }, [levelFilter, search, dateRange])
 
   const filtered = allLogs.filter((log) => {
     const matchesLevel = levelFilter === "all" || log.level === levelFilter
@@ -104,6 +115,16 @@ export function AgentLogsView({
   })
 
   const countByLevel = (level: LogLevel) => allLogs.filter((l) => l.level === level).length
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePageIndex = Math.min(pageIndex, pageCount - 1)
+  if (safePageIndex !== pageIndex) {
+    queueMicrotask(() => setPageIndex(safePageIndex))
+  }
+  const pageStart = safePageIndex * PAGE_SIZE
+  const paged = filtered.slice(pageStart, pageStart + PAGE_SIZE)
+  const canPrev = safePageIndex > 0
+  const canNext = safePageIndex < pageCount - 1
 
   return (
     <div className="@container/main flex flex-1 flex-col gap-2">
@@ -235,14 +256,14 @@ export function AgentLogsView({
 
         {/* Log list */}
         <div className="overflow-hidden rounded-lg border">
-          {filtered.length === 0 ? (
+          {paged.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
               <InfoIcon className="size-5" />
               No log entries match your filter.
             </div>
           ) : (
             <div className="divide-y">
-              {filtered.map((log) => {
+              {paged.map((log) => {
                 const cfg = levelConfig[log.level]
                 const Icon = cfg.icon
                 return (
@@ -275,9 +296,64 @@ export function AgentLogsView({
           )}
         </div>
 
-        <p className="text-center text-xs text-muted-foreground">
-          Showing {filtered.length} of {allLogs.length} entries
-        </p>
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-xs text-muted-foreground">
+            {filtered.length === 0
+              ? "No entries"
+              : `Showing ${pageStart + 1}–${pageStart + paged.length} of ${filtered.length}${
+                  filtered.length !== allLogs.length ? ` (filtered from ${allLogs.length})` : ""
+                }`}
+          </p>
+          <div className="flex items-center gap-4">
+            <span className="text-xs font-medium">
+              Page {safePageIndex + 1} of {pageCount}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                className="hidden size-8 lg:flex"
+                onClick={() => setPageIndex(0)}
+                disabled={!canPrev}
+                aria-label="Go to first page"
+              >
+                <ChevronsLeftIcon />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="size-8"
+                onClick={() => setPageIndex((i) => Math.max(0, i - 1))}
+                disabled={!canPrev}
+                aria-label="Go to previous page"
+              >
+                <ChevronLeftIcon />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="size-8"
+                onClick={() =>
+                  setPageIndex((i) => Math.min(pageCount - 1, i + 1))
+                }
+                disabled={!canNext}
+                aria-label="Go to next page"
+              >
+                <ChevronRightIcon />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="hidden size-8 lg:flex"
+                onClick={() => setPageIndex(pageCount - 1)}
+                disabled={!canNext}
+                aria-label="Go to last page"
+              >
+                <ChevronsRightIcon />
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )
