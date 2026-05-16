@@ -6,14 +6,21 @@ import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
 import {
+  CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ChevronsLeftIcon,
+  ChevronsRightIcon,
   ExternalLinkIcon,
   KeyRoundIcon,
   MailIcon,
   MoreHorizontalIcon,
   RefreshCwIcon,
+  SearchIcon,
   ShieldCheckIcon,
   ShieldIcon,
   UserMinusIcon,
+  UsersIcon,
   UsersRoundIcon,
   XIcon,
 } from "lucide-react"
@@ -28,6 +35,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
 import {
   Dialog,
   DialogContent,
@@ -103,6 +118,8 @@ const inviteSchema = z.object({
 })
 type InviteValues = z.infer<typeof inviteSchema>
 
+const PAGE_SIZE = 10
+
 export function TeamPageClient({
   isAdmin,
   members,
@@ -112,6 +129,8 @@ export function TeamPageClient({
   members: Member[]
   pendingInvites: Invite[]
 }) {
+  const [memberFilter, setMemberFilter] = React.useState<string>("all")
+
   return (
     <div className="@container/main flex flex-1 flex-col gap-2">
       <div className="flex flex-col gap-6 py-4 md:gap-8 md:py-6 px-4 lg:px-6">
@@ -131,11 +150,16 @@ export function TeamPageClient({
           </p>
         )}
 
-        <MembersTable members={members} isAdmin={isAdmin} />
+        {isAdmin && <EnterpriseSection />}
+
+        <MembersTable
+          members={members}
+          isAdmin={isAdmin}
+          memberFilter={memberFilter}
+          onMemberFilterChange={setMemberFilter}
+        />
 
         <PendingInvitesTable invites={pendingInvites} isAdmin={isAdmin} />
-
-        {isAdmin && <EnterpriseSection />}
       </div>
     </div>
   )
@@ -332,14 +356,52 @@ function initialsFrom(name: string) {
     .join("")
 }
 
-function MembersTable({ members, isAdmin }: { members: Member[]; isAdmin: boolean }) {
+function MembersTable({
+  members,
+  isAdmin,
+  memberFilter,
+  onMemberFilterChange,
+}: {
+  members: Member[]
+  isAdmin: boolean
+  memberFilter: string
+  onMemberFilterChange: (next: string) => void
+}) {
+  const [pageIndex, setPageIndex] = React.useState(0)
+
+  React.useEffect(() => {
+    setPageIndex(0)
+  }, [memberFilter, members.length])
+
+  const filtered =
+    memberFilter === "all"
+      ? members
+      : members.filter((m) => m.userId === memberFilter)
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePageIndex = Math.min(pageIndex, pageCount - 1)
+  if (safePageIndex !== pageIndex) {
+    queueMicrotask(() => setPageIndex(safePageIndex))
+  }
+  const pageStart = safePageIndex * PAGE_SIZE
+  const paged = filtered.slice(pageStart, pageStart + PAGE_SIZE)
+  const canPrev = safePageIndex > 0
+  const canNext = safePageIndex < pageCount - 1
+
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Members ({members.length})</CardTitle>
-        <CardDescription>Everyone in your organization.</CardDescription>
+      <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+        <div className="flex flex-col gap-1">
+          <CardTitle className="text-base">Members ({members.length})</CardTitle>
+          <CardDescription>Everyone in your organization.</CardDescription>
+        </div>
+        <MemberSearch
+          members={members}
+          value={memberFilter}
+          onChange={onMemberFilterChange}
+        />
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className="flex flex-col gap-3 p-0">
         <Table>
           <TableHeader>
             <TableRow>
@@ -350,13 +412,206 @@ function MembersTable({ members, isAdmin }: { members: Member[]; isAdmin: boolea
             </TableRow>
           </TableHeader>
           <TableBody>
-            {members.map((m) => (
-              <MemberRow key={m.membershipId} member={m} isAdmin={isAdmin} />
-            ))}
+            {paged.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={isAdmin ? 4 : 3}
+                  className="h-24 text-center text-sm text-muted-foreground"
+                >
+                  No members match your search.
+                </TableCell>
+              </TableRow>
+            ) : (
+              paged.map((m) => (
+                <MemberRow key={m.membershipId} member={m} isAdmin={isAdmin} />
+              ))
+            )}
           </TableBody>
         </Table>
+        <PaginationFooter
+          pageStart={pageStart}
+          pagedCount={paged.length}
+          filteredCount={filtered.length}
+          totalCount={members.length}
+          pageIndex={safePageIndex}
+          pageCount={pageCount}
+          canPrev={canPrev}
+          canNext={canNext}
+          onPageChange={setPageIndex}
+        />
       </CardContent>
     </Card>
+  )
+}
+
+function MemberSearch({
+  members,
+  value,
+  onChange,
+}: {
+  members: Member[]
+  value: string
+  onChange: (next: string) => void
+}) {
+  const [open, setOpen] = React.useState(false)
+  const selected = value === "all" ? null : members.find((m) => m.userId === value)
+
+  function pick(next: string) {
+    onChange(next)
+    setOpen(false)
+  }
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setOpen(true)}
+        className="h-8 justify-start gap-2 text-xs font-normal sm:w-56"
+      >
+        <SearchIcon className="size-3.5" />
+        {selected ? (
+          <span className="truncate">{selected.name}</span>
+        ) : (
+          <span className="text-muted-foreground">Search members...</span>
+        )}
+      </Button>
+      <CommandDialog open={open} onOpenChange={setOpen}>
+        <CommandInput placeholder="Search members by name or email..." />
+        <CommandList>
+          <CommandEmpty>No members match your search.</CommandEmpty>
+          <CommandGroup>
+            <CommandItem
+              value="all members"
+              onSelect={() => pick("all")}
+              className="flex items-center gap-3"
+            >
+              <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted">
+                <UsersIcon className="size-3.5 text-muted-foreground" />
+              </div>
+              <div className="flex flex-1 flex-col">
+                <span className="text-sm font-medium">All members</span>
+                <span className="text-xs text-muted-foreground">
+                  Show everyone in the organization
+                </span>
+              </div>
+              <span className="text-xs text-muted-foreground">{members.length}</span>
+              {value === "all" && <CheckIcon className="ml-1 size-4" />}
+            </CommandItem>
+          </CommandGroup>
+          {members.length > 0 && (
+            <CommandGroup heading="Members">
+              {members.map((m) => (
+                <CommandItem
+                  key={m.userId}
+                  value={`${m.name} ${m.email}`}
+                  onSelect={() => pick(m.userId)}
+                  className="flex items-center gap-3"
+                >
+                  <Avatar className="size-7">
+                    {m.avatarUrl && <AvatarImage src={m.avatarUrl} alt={m.name} />}
+                    <AvatarFallback className="text-[10px]">
+                      {initialsFrom(m.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-1 flex-col min-w-0">
+                    <span className="text-sm font-medium truncate">{m.name}</span>
+                    <span className="line-clamp-1 text-xs text-muted-foreground">
+                      {m.email}
+                    </span>
+                  </div>
+                  <Badge variant={m.roleSlug === "admin" ? "default" : "secondary"} className="text-[10px]">
+                    {m.roleSlug === "admin" ? "Admin" : "Member"}
+                  </Badge>
+                  {value === m.userId && <CheckIcon className="ml-1 size-4" />}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+        </CommandList>
+      </CommandDialog>
+    </>
+  )
+}
+
+function PaginationFooter({
+  pageStart,
+  pagedCount,
+  filteredCount,
+  totalCount,
+  pageIndex,
+  pageCount,
+  canPrev,
+  canNext,
+  onPageChange,
+}: {
+  pageStart: number
+  pagedCount: number
+  filteredCount: number
+  totalCount: number
+  pageIndex: number
+  pageCount: number
+  canPrev: boolean
+  canNext: boolean
+  onPageChange: (next: number) => void
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-t px-4 py-3">
+      <p className="text-xs text-muted-foreground">
+        {filteredCount === 0
+          ? "No entries"
+          : `Showing ${pageStart + 1}–${pageStart + pagedCount} of ${filteredCount}${
+              filteredCount !== totalCount ? ` (filtered from ${totalCount})` : ""
+            }`}
+      </p>
+      <div className="flex items-center gap-4">
+        <span className="text-xs font-medium">
+          Page {pageIndex + 1} of {pageCount}
+        </span>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="icon"
+            className="hidden size-8 lg:flex"
+            onClick={() => onPageChange(0)}
+            disabled={!canPrev}
+            aria-label="Go to first page"
+          >
+            <ChevronsLeftIcon />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            className="size-8"
+            onClick={() => onPageChange(Math.max(0, pageIndex - 1))}
+            disabled={!canPrev}
+            aria-label="Go to previous page"
+          >
+            <ChevronLeftIcon />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            className="size-8"
+            onClick={() => onPageChange(Math.min(pageCount - 1, pageIndex + 1))}
+            disabled={!canNext}
+            aria-label="Go to next page"
+          >
+            <ChevronRightIcon />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            className="hidden size-8 lg:flex"
+            onClick={() => onPageChange(pageCount - 1)}
+            disabled={!canNext}
+            aria-label="Go to last page"
+          >
+            <ChevronsRightIcon />
+          </Button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -495,7 +750,23 @@ function PendingInvitesTable({
   invites: Invite[]
   isAdmin: boolean
 }) {
+  const [pageIndex, setPageIndex] = React.useState(0)
+
+  React.useEffect(() => {
+    setPageIndex(0)
+  }, [invites.length])
+
   if (invites.length === 0) return null
+
+  const pageCount = Math.max(1, Math.ceil(invites.length / PAGE_SIZE))
+  const safePageIndex = Math.min(pageIndex, pageCount - 1)
+  if (safePageIndex !== pageIndex) {
+    queueMicrotask(() => setPageIndex(safePageIndex))
+  }
+  const pageStart = safePageIndex * PAGE_SIZE
+  const paged = invites.slice(pageStart, pageStart + PAGE_SIZE)
+  const canPrev = safePageIndex > 0
+  const canNext = safePageIndex < pageCount - 1
 
   return (
     <Card>
@@ -505,7 +776,7 @@ function PendingInvitesTable({
           Invites that haven&apos;t been accepted yet.
         </CardDescription>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className="flex flex-col gap-3 p-0">
         <Table>
           <TableHeader>
             <TableRow>
@@ -516,11 +787,22 @@ function PendingInvitesTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {invites.map((inv) => (
+            {paged.map((inv) => (
               <InviteRow key={inv.id} invite={inv} isAdmin={isAdmin} />
             ))}
           </TableBody>
         </Table>
+        <PaginationFooter
+          pageStart={pageStart}
+          pagedCount={paged.length}
+          filteredCount={invites.length}
+          totalCount={invites.length}
+          pageIndex={safePageIndex}
+          pageCount={pageCount}
+          canPrev={canPrev}
+          canNext={canNext}
+          onPageChange={setPageIndex}
+        />
       </CardContent>
     </Card>
   )
