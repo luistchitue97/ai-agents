@@ -1,6 +1,7 @@
 import Image from "next/image"
+import Link from "next/link"
 import { withAuth } from "@workos-inc/authkit-nextjs"
-import { CheckCircle2Icon, PlusIcon } from "lucide-react"
+import { ArrowRightIcon, CheckCircle2Icon, PlusIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -15,10 +16,30 @@ import { prisma } from "@/lib/prisma"
 
 import { DisconnectButton } from "./disconnect-button"
 
+type CatalogEntry = {
+  id: string | null
+  name: string
+  description: string
+  category: string
+  icon: string
+  /** If set and connected, surface an Open button that links here. */
+  viewHref?: string
+  /** Label for the view button. */
+  viewLabel?: string
+}
+
 // Static catalog: visual rows for the page. The `id` matches a key in
-// lib/integrations/providers.ts when OAuth has been wired (currently: github).
-const catalog = [
-  { id: null, name: "Google Workspace", description: "Sync calendars, contacts, Drive files, and Gmail into your workflow.", category: "Productivity", icon: "/icons/google.svg" },
+// lib/integrations/providers.ts when OAuth has been wired (currently: github, gmail).
+const catalog: CatalogEntry[] = [
+  {
+    id: "gmail",
+    name: "Gmail",
+    description: "Read your inbox. Your agents can search messages and surface what matters.",
+    category: "Productivity",
+    icon: "/icons/google.svg",
+    viewHref: "/dashboard/integrations/gmail",
+    viewLabel: "Open inbox",
+  },
   { id: null, name: "Jira", description: "Import issues, sprints, and project boards from Jira automatically.", category: "Project Management", icon: "/icons/jira.svg" },
   { id: null, name: "Slack", description: "Send notifications and receive updates directly in your Slack channels.", category: "Communication", icon: "/icons/slack.svg" },
   { id: "github", name: "GitHub", description: "Link pull requests, issues, and commits to your projects and tasks.", category: "Engineering", icon: "/icons/github.svg" },
@@ -30,7 +51,7 @@ const catalog = [
   { id: null, name: "Zapier", description: "Automate workflows by connecting to thousands of apps via Zapier.", category: "Automation", icon: "/icons/zapier.svg" },
   { id: null, name: "Asana", description: "Bring Asana tasks and timelines into your unified project view.", category: "Project Management", icon: "/icons/asana.svg" },
   { id: null, name: "Stripe", description: "Monitor payments, subscriptions, and revenue metrics in real time.", category: "Finance", icon: "/icons/stripe.svg" },
-] as const
+]
 
 type Connection = {
   id: string
@@ -100,12 +121,7 @@ export default async function IntegrationsPage() {
 function IntegrationCard({
   row,
 }: {
-  row: {
-    id: string | null
-    name: string
-    description: string
-    category: string
-    icon: string
+  row: CatalogEntry & {
     connection: Connection | null
     wired: boolean
   }
@@ -137,12 +153,26 @@ function IntegrationCard({
       <CardContent className="flex flex-1 flex-col justify-between gap-4 pt-0">
         <CardDescription className="text-xs leading-relaxed">
           {row.connection?.accountLogin
-            ? `Connected as @${row.connection.accountLogin}.`
+            ? `Connected as ${row.connection.accountLogin}.`
             : row.description}
         </CardDescription>
 
         {row.connection ? (
-          <DisconnectButton connectionId={row.connection.id} providerName={row.name} />
+          <div className="flex gap-2">
+            {row.viewHref && (
+              <Button size="sm" variant="default" className="flex-1" asChild>
+                <Link href={row.viewHref}>
+                  {row.viewLabel ?? "Open"}
+                  <ArrowRightIcon />
+                </Link>
+              </Button>
+            )}
+            <DisconnectButton
+              connectionId={row.connection.id}
+              providerName={row.name}
+              className={row.viewHref ? "flex-1" : "w-full"}
+            />
+          </div>
         ) : row.wired && row.id ? (
           <Button size="sm" variant="default" className="w-full" asChild>
             <a href={`/api/integrations/${row.id}/connect`}>

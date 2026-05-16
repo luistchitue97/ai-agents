@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto"
 import { NextResponse, type NextRequest } from "next/server"
 import { withAuth } from "@workos-inc/authkit-nextjs"
 
-import { getProvider } from "@/lib/integrations/providers"
+import { envPrefixFor, getProvider } from "@/lib/integrations/providers"
 
 const STATE_COOKIE = "integration_oauth_state"
 const STATE_MAX_AGE = 600 // 10 minutes
@@ -22,10 +22,11 @@ export async function GET(
     return NextResponse.redirect(new URL("/onboarding/organization", request.url))
   }
 
-  const clientId = process.env[`${providerId.toUpperCase()}_CLIENT_ID`]
+  const envPrefix = envPrefixFor(provider)
+  const clientId = process.env[`${envPrefix}_CLIENT_ID`]
   if (!clientId) {
     return NextResponse.json(
-      { error: `${providerId.toUpperCase()}_CLIENT_ID is not configured.` },
+      { error: `${envPrefix}_CLIENT_ID is not configured.` },
       { status: 500 }
     )
   }
@@ -36,9 +37,12 @@ export async function GET(
   const authorizeUrl = new URL(provider.oauth.authorizeUrl)
   authorizeUrl.searchParams.set("client_id", clientId)
   authorizeUrl.searchParams.set("redirect_uri", redirectUri)
+  authorizeUrl.searchParams.set("response_type", "code")
   authorizeUrl.searchParams.set("scope", provider.oauth.scopes.join(" "))
   authorizeUrl.searchParams.set("state", state)
-  authorizeUrl.searchParams.set("allow_signup", "false")
+  for (const [k, v] of Object.entries(provider.oauth.extraAuthorizeParams ?? {})) {
+    authorizeUrl.searchParams.set(k, v)
+  }
 
   const response = NextResponse.redirect(authorizeUrl)
   response.cookies.set(STATE_COOKIE, state, {

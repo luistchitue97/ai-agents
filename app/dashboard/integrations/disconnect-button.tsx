@@ -10,9 +10,11 @@ import { disconnectIntegration } from "./actions"
 export function DisconnectButton({
   connectionId,
   providerName,
+  className,
 }: {
   connectionId: string
   providerName: string
+  className?: string
 }) {
   const [isPending, startTransition] = React.useTransition()
 
@@ -20,7 +22,7 @@ export function DisconnectButton({
     <Button
       size="sm"
       variant="outline"
-      className="w-full"
+      className={className ?? "w-full"}
       disabled={isPending}
       onClick={() =>
         startTransition(async () => {

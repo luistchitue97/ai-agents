@@ -3,7 +3,7 @@ import { withAuth } from "@workos-inc/authkit-nextjs"
 
 import { logAudit } from "@/lib/audit"
 import { encryptSecret } from "@/lib/crypto"
-import { getProvider } from "@/lib/integrations/providers"
+import { envPrefixFor, getProvider } from "@/lib/integrations/providers"
 import { notifyOrg } from "@/lib/notifications"
 import { prisma } from "@/lib/prisma"
 
@@ -35,8 +35,9 @@ export async function GET(
     return NextResponse.redirect(new URL("/onboarding/organization", request.url))
   }
 
-  const clientId = process.env[`${providerId.toUpperCase()}_CLIENT_ID`]
-  const clientSecret = process.env[`${providerId.toUpperCase()}_CLIENT_SECRET`]
+  const envPrefix = envPrefixFor(provider)
+  const clientId = process.env[`${envPrefix}_CLIENT_ID`]
+  const clientSecret = process.env[`${envPrefix}_CLIENT_SECRET`]
   if (!clientId || !clientSecret) return fail(request, "provider_not_configured")
 
   const redirectUri = new URL(
@@ -44,16 +45,25 @@ export async function GET(
     request.url
   ).toString()
 
-  // Exchange code for token.
+  // Exchange code for token. Google expects form-encoded, GitHub accepts JSON.
+  const encoding = provider.oauth.tokenRequestEncoding ?? "json"
+  const tokenParams: Record<string, string> = {
+    client_id: clientId,
+    client_secret: clientSecret,
+    code,
+    redirect_uri: redirectUri,
+    grant_type: "authorization_code",
+  }
   const tokenRes = await fetch(provider.oauth.tokenUrl, {
     method: "POST",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
-    body: JSON.stringify({
-      client_id: clientId,
-      client_secret: clientSecret,
-      code,
-      redirect_uri: redirectUri,
-    }),
+    headers:
+      encoding === "form"
+        ? { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" }
+        : { Accept: "application/json", "Content-Type": "application/json" },
+    body:
+      encoding === "form"
+        ? new URLSearchParams(tokenParams)
+        : JSON.stringify(tokenParams),
   })
   const tokenJson = (await tokenRes.json().catch(() => null)) as {
     access_token?: string
@@ -61,6 +71,7 @@ export async function GET(
     expires_in?: number
     scope?: string
     error?: string
+    error_description?: string
   } | null
 
   if (!tokenRes.ok || !tokenJson?.access_token) {
@@ -68,24 +79,21 @@ export async function GET(
   }
 
   // Profile the user so we can show a friendly account label.
-  const profileRes = await fetch(provider.oauth.profileUrl, {
-    headers: {
-      Authorization: `Bearer ${tokenJson.access_token}`,
-      Accept: "application/vnd.github+json",
-      "User-Agent": "ai-agents-app",
-    },
-  })
-  const profile = (await profileRes.json().catch(() => null)) as {
-    id?: number | string
-    login?: string
-    name?: string | null
-  } | null
-
-  if (!profileRes.ok || !profile?.id) {
+  const profileHeaders: Record<string, string> = {
+    Authorization: `Bearer ${tokenJson.access_token}`,
+    Accept: "application/json",
+    ...(provider.oauth.profileHeaders ?? {}),
+  }
+  const profileRes = await fetch(provider.oauth.profileUrl, { headers: profileHeaders })
+  const profileRaw = await profileRes.json().catch(() => null)
+  if (!profileRes.ok || !profileRaw) {
+    return fail(request, "profile_lookup_failed")
+  }
+  const profile = provider.oauth.parseProfile(profileRaw)
+  if (!profile.id) {
     return fail(request, "profile_lookup_failed")
   }
 
-  const accountId = String(profile.id)
   const tokenExpiresAt = tokenJson.expires_in
     ? new Date(Date.now() + tokenJson.expires_in * 1000)
     : null
@@ -95,7 +103,7 @@ export async function GET(
       organizationId_providerId_accountId: {
         organizationId,
         providerId,
-        accountId,
+        accountId: profile.id,
       },
     },
     create: {
@@ -105,13 +113,18 @@ export async function GET(
       refreshToken: tokenJson.refresh_token ? encryptSecret(tokenJson.refresh_token) : null,
       tokenExpiresAt,
       scope: tokenJson.scope ?? null,
-      accountId,
+      accountId: profile.id,
       accountLogin: profile.login ?? null,
       accountName: profile.name ?? null,
     },
     update: {
       accessToken: encryptSecret(tokenJson.access_token),
-      refreshToken: tokenJson.refresh_token ? encryptSecret(tokenJson.refresh_token) : null,
+      // Only overwrite refresh_token when the provider gave us a new one. Google often
+      // returns no refresh_token on subsequent authorizations, and we don't want to wipe
+      // the existing one.
+      ...(tokenJson.refresh_token
+        ? { refreshToken: encryptSecret(tokenJson.refresh_token) }
+        : {}),
       tokenExpiresAt,
       scope: tokenJson.scope ?? null,
       accountLogin: profile.login ?? null,
@@ -133,9 +146,9 @@ export async function GET(
       type: "integration.connected",
       title: `${provider.name} connected`,
       body: profile.login
-        ? `Linked to @${profile.login}. Your agents can now use it.`
+        ? `Linked to ${profile.login}. Your agents can now use it.`
         : `Your agents can now use ${provider.name}.`,
-      link: "/dashboard/integrations",
+      link: provider.viewHref ?? "/dashboard/integrations",
     },
     { exceptUserId: user.id }
   )
