@@ -1,3 +1,4 @@
+import { NotificationsBell } from "@/components/notifications-bell"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { SearchTrigger } from "@/components/search-trigger"
@@ -12,6 +13,9 @@ export function SiteHeader() {
           className="mx-2 data-[orientation=vertical]:h-4"
         />
         <SearchTrigger />
+        <div className="ml-auto flex items-center gap-2">
+          <NotificationsBell />
+        </div>
       </div>
     </header>
   )

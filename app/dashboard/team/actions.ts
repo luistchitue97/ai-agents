@@ -7,6 +7,7 @@ import { z } from "zod"
 
 import { logAudit } from "@/lib/audit"
 import { requireAdminContext } from "@/lib/auth"
+import { notifyAdmins, notifyUser } from "@/lib/notifications"
 
 const inviteSchema = z.object({
   email: z.string().trim().toLowerCase().email("Enter a valid email"),
@@ -32,6 +33,16 @@ export async function sendInvite(input: z.infer<typeof inviteSchema>) {
     targetLabel: data.email,
     metadata: { roleSlug: data.roleSlug },
   })
+  await notifyAdmins(
+    organizationId,
+    {
+      type: "member.invited",
+      title: `Invitation sent to ${data.email}`,
+      body: `Role: ${data.roleSlug}.`,
+      link: "/dashboard/team",
+    },
+    { exceptUserId: user.id }
+  )
 
   revalidatePath("/dashboard/team")
 }
@@ -114,6 +125,17 @@ export async function changeMemberRole(input: z.infer<typeof roleChangeSchema>) 
     targetLabel,
     metadata: { previousRole, newRole: data.roleSlug },
   })
+  await notifyUser(target.userId, organizationId, {
+    type: "member.role_changed",
+    title:
+      data.roleSlug === "admin"
+        ? "You're now an admin"
+        : "Your role was updated",
+    body: previousRole
+      ? `Your role changed from ${previousRole} to ${data.roleSlug}.`
+      : `Your role is now ${data.roleSlug}.`,
+    link: "/dashboard/team",
+  })
   revalidatePath("/dashboard/team")
 }
 
@@ -148,6 +170,15 @@ export async function removeMember(membershipId: string) {
     targetId: membershipId,
     targetLabel,
   })
+  await notifyAdmins(
+    organizationId,
+    {
+      type: "member.removed",
+      title: `${targetLabel} was removed`,
+      link: "/dashboard/team",
+    },
+    { exceptUserId: user.id }
+  )
   revalidatePath("/dashboard/team")
 }
 

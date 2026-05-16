@@ -6,6 +6,7 @@ import { z } from "zod"
 
 import { logAudit } from "@/lib/audit"
 import { requireAdminContext, requireOrgContext } from "@/lib/auth"
+import { notifyOrg } from "@/lib/notifications"
 import { prisma } from "@/lib/prisma"
 import { normalizeAgentName } from "./data"
 
@@ -50,7 +51,7 @@ const newAgentSchema = z.object({
 })
 
 export async function createAgent(input: z.infer<typeof newAgentSchema>) {
-  const { organizationId } = await requireOrgContext()
+  const { user, organizationId } = await requireOrgContext()
   const data = newAgentSchema.parse(input)
   const nameKey = normalizeAgentName(data.name)
 
@@ -83,6 +84,16 @@ export async function createAgent(input: z.infer<typeof newAgentSchema>) {
       targetId: String(agent.id),
       targetLabel: agent.name,
     })
+    await notifyOrg(
+      organizationId,
+      {
+        type: "agent.created",
+        title: `New agent: ${agent.name}`,
+        body: agent.description,
+        link: `/dashboard/agents/${agent.id}`,
+      },
+      { exceptUserId: user.id }
+    )
     revalidatePath("/dashboard/agents")
     return agent
   } catch (err) {

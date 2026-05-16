@@ -4,6 +4,7 @@ import { withAuth } from "@workos-inc/authkit-nextjs"
 import { logAudit } from "@/lib/audit"
 import { encryptSecret } from "@/lib/crypto"
 import { getProvider } from "@/lib/integrations/providers"
+import { notifyOrg } from "@/lib/notifications"
 import { prisma } from "@/lib/prisma"
 
 const STATE_COOKIE = "integration_oauth_state"
@@ -29,7 +30,7 @@ export async function GET(
   if (!code) return fail(request, "missing_code")
   if (!state || !cookieState || state !== cookieState) return fail(request, "state_mismatch")
 
-  const { organizationId } = await withAuth({ ensureSignedIn: true })
+  const { user, organizationId } = await withAuth({ ensureSignedIn: true })
   if (!organizationId) {
     return NextResponse.redirect(new URL("/onboarding/organization", request.url))
   }
@@ -126,6 +127,18 @@ export async function GET(
       ? `${providerId} (@${profile.login})`
       : providerId,
   })
+  await notifyOrg(
+    organizationId,
+    {
+      type: "integration.connected",
+      title: `${provider.name} connected`,
+      body: profile.login
+        ? `Linked to @${profile.login}. Your agents can now use it.`
+        : `Your agents can now use ${provider.name}.`,
+      link: "/dashboard/integrations",
+    },
+    { exceptUserId: user.id }
+  )
 
   const success = new URL("/dashboard/integrations", request.url)
   success.searchParams.set("connected", providerId)
