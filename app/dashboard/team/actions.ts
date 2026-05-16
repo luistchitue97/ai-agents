@@ -2,19 +2,10 @@
 
 import { revalidatePath } from "next/cache"
 import { headers } from "next/headers"
-import { getWorkOS, withAuth } from "@workos-inc/authkit-nextjs"
+import { getWorkOS } from "@workos-inc/authkit-nextjs"
 import { z } from "zod"
 
-async function requireAdminContext() {
-  const { user, organizationId, role } = await withAuth({ ensureSignedIn: true })
-  if (!organizationId) {
-    throw new Error("You must belong to an organization.")
-  }
-  if (role !== "admin") {
-    throw new Error("Only organization admins can perform this action.")
-  }
-  return { user, organizationId }
-}
+import { requireAdminContext } from "@/lib/auth"
 
 const inviteSchema = z.object({
   email: z.string().trim().toLowerCase().email("Enter a valid email"),

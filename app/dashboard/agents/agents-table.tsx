@@ -104,7 +104,8 @@ const statusConfig: Record<AgentStatus, { label: string; className: string }> = 
   paused: { label: "Paused", className: "bg-muted text-muted-foreground" },
 }
 
-const columns: ColumnDef<Agent>[] = [
+function buildColumns(isAdmin: boolean): ColumnDef<Agent>[] {
+  return [
   {
     id: "select",
     header: ({ table }) => (
@@ -238,17 +239,29 @@ const columns: ColumnDef<Agent>[] = [
               <Link href={`/dashboard/agents/${row.original.id}/logs`}>View logs</Link>
             </DropdownMenuItem>
             <DropdownMenuItem>Duplicate</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
+            {isAdmin && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
     ),
   },
-]
+  ]
+}
 
-export function AgentsTable({ initialData }: { initialData: Agent[] }) {
+export function AgentsTable({
+  initialData,
+  isAdmin,
+}: {
+  initialData: Agent[]
+  isAdmin: boolean
+}) {
   const [data, setData] = React.useState(initialData)
+  const columns = React.useMemo(() => buildColumns(isAdmin), [isAdmin])
   React.useEffect(() => {
     setData(initialData)
   }, [initialData])
@@ -369,20 +382,22 @@ export function AgentsTable({ initialData }: { initialData: Agent[] }) {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="destructive"
-              size="sm"
-              disabled={table.getFilteredSelectedRowModel().rows.length === 0}
-              onClick={() => setDeleteDialogOpen(true)}
-            >
-              <Trash2Icon />
-              <span className="hidden lg:inline">
-                Delete{" "}
-                {table.getFilteredSelectedRowModel().rows.length > 0
-                  ? `(${table.getFilteredSelectedRowModel().rows.length})`
-                  : "Selected"}
-              </span>
-            </Button>
+            {isAdmin && (
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={table.getFilteredSelectedRowModel().rows.length === 0}
+                onClick={() => setDeleteDialogOpen(true)}
+              >
+                <Trash2Icon />
+                <span className="hidden lg:inline">
+                  Delete{" "}
+                  {table.getFilteredSelectedRowModel().rows.length > 0
+                    ? `(${table.getFilteredSelectedRowModel().rows.length})`
+                    : "Selected"}
+                </span>
+              </Button>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm">

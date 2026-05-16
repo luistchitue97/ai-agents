@@ -2,22 +2,14 @@
 
 import { revalidatePath } from "next/cache"
 import { Prisma } from "@prisma/client"
-import { withAuth } from "@workos-inc/authkit-nextjs"
 import { z } from "zod"
 
+import { requireAdminContext, requireOrgContext } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { normalizeAgentName } from "./data"
 
-async function requireOrgId(): Promise<string> {
-  const { organizationId } = await withAuth({ ensureSignedIn: true })
-  if (!organizationId) {
-    throw new Error("You must belong to an organization to perform this action.")
-  }
-  return organizationId
-}
-
 export async function deleteAgents(ids: number[]) {
-  const organizationId = await requireOrgId()
+  const { organizationId } = await requireAdminContext()
   const validIds = ids.filter((id) => Number.isInteger(id) && id > 0)
   if (validIds.length === 0) {
     throw new Error("No valid agents selected.")
@@ -30,7 +22,7 @@ export async function deleteAgents(ids: number[]) {
 }
 
 export async function listAgents() {
-  const organizationId = await requireOrgId()
+  const { organizationId } = await requireOrgContext()
   return prisma.agent.findMany({
     where: { organizationId },
     select: { id: true, name: true, description: true, status: true, model: true },
@@ -45,7 +37,7 @@ const newAgentSchema = z.object({
 })
 
 export async function createAgent(input: z.infer<typeof newAgentSchema>) {
-  const organizationId = await requireOrgId()
+  const { organizationId } = await requireOrgContext()
   const data = newAgentSchema.parse(input)
   const nameKey = normalizeAgentName(data.name)
 

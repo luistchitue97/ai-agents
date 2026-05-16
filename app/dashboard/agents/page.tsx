@@ -6,7 +6,7 @@ import { AgentsTable } from "./agents-table"
 import { formatLastActive, type Agent } from "./data"
 
 export default async function AgentsPage() {
-  const { organizationId } = await withAuth({ ensureSignedIn: true })
+  const { organizationId, role } = await withAuth({ ensureSignedIn: true })
   const rows = organizationId
     ? await prisma.agent.findMany({
         where: { organizationId },
@@ -23,5 +23,5 @@ export default async function AgentsPage() {
     lastActive: formatLastActive(a.lastActive),
     capabilities: a.capabilities,
   }))
-  return <AgentsTable initialData={agents} />
+  return <AgentsTable initialData={agents} isAdmin={role === "admin"} />
 }
