@@ -5,6 +5,7 @@ import { headers } from "next/headers"
 import { getWorkOS } from "@workos-inc/authkit-nextjs"
 import { z } from "zod"
 
+import { logAudit } from "@/lib/audit"
 import { requireAdminContext } from "@/lib/auth"
 
 const inviteSchema = z.object({
@@ -17,11 +18,19 @@ export async function sendInvite(input: z.infer<typeof inviteSchema>) {
   const { user, organizationId } = await requireAdminContext()
   const workos = getWorkOS()
 
-  await workos.userManagement.sendInvitation({
+  const invitation = await workos.userManagement.sendInvitation({
     email: data.email,
     organizationId,
     roleSlug: data.roleSlug,
     inviterUserId: user.id,
+  })
+
+  await logAudit({
+    action: "member.invited",
+    targetType: "invitation",
+    targetId: invitation.id,
+    targetLabel: data.email,
+    metadata: { roleSlug: data.roleSlug },
   })
 
   revalidatePath("/dashboard/team")
@@ -37,6 +46,12 @@ export async function revokeInvite(invitationId: string) {
   }
 
   await workos.userManagement.revokeInvitation(invitationId)
+  await logAudit({
+    action: "member.invite_revoked",
+    targetType: "invitation",
+    targetId: invitationId,
+    targetLabel: invitation.email,
+  })
   revalidatePath("/dashboard/team")
 }
 
@@ -50,6 +65,12 @@ export async function resendInvite(invitationId: string) {
   }
 
   await workos.userManagement.resendInvitation(invitationId)
+  await logAudit({
+    action: "member.invite_resent",
+    targetType: "invitation",
+    targetId: invitationId,
+    targetLabel: invitation.email,
+  })
   revalidatePath("/dashboard/team")
 }
 
@@ -73,8 +94,25 @@ export async function changeMemberRole(input: z.infer<typeof roleChangeSchema>) 
     throw new Error("Member not found in this organization.")
   }
 
+  const previousRole = target.role?.slug ?? null
   await workos.userManagement.updateOrganizationMembership(data.membershipId, {
     roleSlug: data.roleSlug,
+  })
+
+  let targetLabel: string | undefined
+  try {
+    const targetUser = await workos.userManagement.getUser(target.userId)
+    targetLabel = targetUser.email
+  } catch {
+    targetLabel = target.userId
+  }
+
+  await logAudit({
+    action: "member.role_changed",
+    targetType: "membership",
+    targetId: data.membershipId,
+    targetLabel,
+    metadata: { previousRole, newRole: data.roleSlug },
   })
   revalidatePath("/dashboard/team")
 }
@@ -95,7 +133,21 @@ export async function removeMember(membershipId: string) {
     throw new Error("You can't remove yourself. Have another admin do it.")
   }
 
+  let targetLabel: string | undefined
+  try {
+    const targetUser = await workos.userManagement.getUser(target.userId)
+    targetLabel = targetUser.email
+  } catch {
+    targetLabel = target.userId
+  }
+
   await workos.userManagement.deleteOrganizationMembership(membershipId)
+  await logAudit({
+    action: "member.removed",
+    targetType: "membership",
+    targetId: membershipId,
+    targetLabel,
+  })
   revalidatePath("/dashboard/team")
 }
 

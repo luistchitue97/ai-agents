@@ -13,7 +13,7 @@ import {
   SidebarFooter,
   SidebarHeader,
 } from "@/components/ui/sidebar"
-import { LayoutDashboardIcon, ListIcon, ChartBarIcon, FolderIcon, BotIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, PlugZapIcon, UsersIcon } from "lucide-react"
+import { LayoutDashboardIcon, ListIcon, ChartBarIcon, FolderIcon, BotIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, PlugZapIcon, UsersIcon, ScrollTextIcon } from "lucide-react"
 
 const data = {
   user: {
@@ -196,12 +196,24 @@ export function AppSidebar({
   user,
   organizations,
   currentOrgId,
+  isAdmin,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
   user?: SidebarUser
   organizations?: OrgOption[]
   currentOrgId?: string
+  isAdmin?: boolean
 }) {
+  const navMain = isAdmin
+    ? [
+        ...data.navMain,
+        {
+          title: "Audit Log",
+          url: "/dashboard/logs",
+          icon: <ScrollTextIcon />,
+        },
+      ]
+    : data.navMain
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -210,7 +222,7 @@ export function AppSidebar({
         )}
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={navMain} />
         <NavDocuments items={data.documents} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>

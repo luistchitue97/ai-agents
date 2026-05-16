@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { withAuth } from "@workos-inc/authkit-nextjs"
 
+import { logAudit } from "@/lib/audit"
 import { encryptSecret } from "@/lib/crypto"
 import { getProvider } from "@/lib/integrations/providers"
 import { prisma } from "@/lib/prisma"
@@ -88,7 +89,7 @@ export async function GET(
     ? new Date(Date.now() + tokenJson.expires_in * 1000)
     : null
 
-  await prisma.integrationConnection.upsert({
+  const connection = await prisma.integrationConnection.upsert({
     where: {
       organizationId_providerId_accountId: {
         organizationId,
@@ -115,6 +116,15 @@ export async function GET(
       accountLogin: profile.login ?? null,
       accountName: profile.name ?? null,
     },
+  })
+
+  await logAudit({
+    action: "integration.connected",
+    targetType: "integration_connection",
+    targetId: connection.id,
+    targetLabel: profile.login
+      ? `${providerId} (@${profile.login})`
+      : providerId,
   })
 
   const success = new URL("/dashboard/integrations", request.url)

@@ -12,7 +12,7 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { user, organizationId } = await withAuth({ ensureSignedIn: true })
+  const { user, organizationId, role } = await withAuth({ ensureSignedIn: true })
 
   if (!organizationId) redirect("/onboarding/organization")
 
@@ -48,6 +48,7 @@ export default async function DashboardLayout({
         }}
         organizations={organizations}
         currentOrgId={organizationId}
+        isAdmin={role === "admin"}
       />
       <CommandMenu />
       <Toaster position="top-center" />

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { Prisma } from "@prisma/client"
 import { z } from "zod"
 
+import { logAudit } from "@/lib/audit"
 import { requireAdminContext, requireOrgContext } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { normalizeAgentName } from "./data"
@@ -14,9 +15,21 @@ export async function deleteAgents(ids: number[]) {
   if (validIds.length === 0) {
     throw new Error("No valid agents selected.")
   }
+  const targets = await prisma.agent.findMany({
+    where: { id: { in: validIds }, organizationId },
+    select: { id: true, name: true },
+  })
   const result = await prisma.agent.deleteMany({
     where: { id: { in: validIds }, organizationId },
   })
+  for (const t of targets) {
+    await logAudit({
+      action: "agent.deleted",
+      targetType: "agent",
+      targetId: String(t.id),
+      targetLabel: t.name,
+    })
+  }
   revalidatePath("/dashboard/agents")
   return { deleted: result.count }
 }
@@ -63,6 +76,12 @@ export async function createAgent(input: z.infer<typeof newAgentSchema>) {
         model: "Claude Sonnet 4.6",
         capabilities: data.capabilities ?? [],
       },
+    })
+    await logAudit({
+      action: "agent.created",
+      targetType: "agent",
+      targetId: String(agent.id),
+      targetLabel: agent.name,
     })
     revalidatePath("/dashboard/agents")
     return agent
