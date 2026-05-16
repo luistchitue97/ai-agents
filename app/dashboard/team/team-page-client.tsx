@@ -6,12 +6,15 @@ import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
 import {
+  ExternalLinkIcon,
+  KeyRoundIcon,
   MailIcon,
   MoreHorizontalIcon,
   RefreshCwIcon,
   ShieldCheckIcon,
   ShieldIcon,
   UserMinusIcon,
+  UsersRoundIcon,
   XIcon,
 } from "lucide-react"
 
@@ -68,6 +71,7 @@ import {
 
 import {
   changeMemberRole,
+  generatePortalLink,
   removeMember,
   resendInvite,
   revokeInvite,
@@ -130,8 +134,89 @@ export function TeamPageClient({
         <MembersTable members={members} isAdmin={isAdmin} />
 
         <PendingInvitesTable invites={pendingInvites} isAdmin={isAdmin} />
+
+        {isAdmin && <EnterpriseSection />}
       </div>
     </div>
+  )
+}
+
+type PortalIntent = "sso" | "dsync" | "audit_logs" | "domain_verification"
+
+function EnterpriseSection() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Enterprise SSO &amp; Directory Sync</CardTitle>
+        <CardDescription>
+          Open the WorkOS Admin Portal to configure SAML/OIDC sign-in or SCIM
+          provisioning for your organization. Links are short-lived and
+          single-use.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-3 sm:grid-cols-2">
+        <PortalLinkButton
+          intent="sso"
+          label="Configure SSO"
+          description="SAML or OIDC sign-in"
+          icon={<KeyRoundIcon />}
+        />
+        <PortalLinkButton
+          intent="dsync"
+          label="Configure Directory Sync"
+          description="SCIM user provisioning"
+          icon={<UsersRoundIcon />}
+        />
+      </CardContent>
+    </Card>
+  )
+}
+
+function PortalLinkButton({
+  intent,
+  label,
+  description,
+  icon,
+}: {
+  intent: PortalIntent
+  label: string
+  description: string
+  icon: React.ReactNode
+}) {
+  const [isPending, startTransition] = React.useTransition()
+
+  function onClick() {
+    startTransition(async () => {
+      try {
+        const { link } = await generatePortalLink({ intent })
+        // Open in a new tab so the admin can return here if they cancel.
+        window.open(link, "_blank", "noopener,noreferrer")
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to open portal.")
+      }
+    })
+  }
+
+  return (
+    <Button
+      variant="outline"
+      onClick={onClick}
+      disabled={isPending}
+      className="h-auto justify-start gap-3 py-3"
+    >
+      <span className="shrink-0">{icon}</span>
+      <span className="flex flex-1 flex-col items-start gap-0.5">
+        <span className="text-sm font-medium">{label}</span>
+        <span className="text-xs text-muted-foreground font-normal">
+          {description}
+        </span>
+      </span>
+      {isPending ? (
+        <span className="text-xs text-muted-foreground">Opening...</span>
+      ) : (
+        <ExternalLinkIcon className="size-3.5 shrink-0 text-muted-foreground" />
+      )}
+    </Button>
   )
 }
 

@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { headers } from "next/headers"
 import { getWorkOS, withAuth } from "@workos-inc/authkit-nextjs"
 import { z } from "zod"
 
@@ -105,4 +106,30 @@ export async function removeMember(membershipId: string) {
 
   await workos.userManagement.deleteOrganizationMembership(membershipId)
   revalidatePath("/dashboard/team")
+}
+
+const portalIntents = ["sso", "dsync", "audit_logs", "domain_verification"] as const
+const portalLinkSchema = z.object({
+  intent: z.enum(portalIntents),
+})
+
+export async function generatePortalLink(
+  input: z.infer<typeof portalLinkSchema>
+): Promise<{ link: string }> {
+  const { intent } = portalLinkSchema.parse(input)
+  const { organizationId } = await requireAdminContext()
+  const workos = getWorkOS()
+
+  const h = await headers()
+  const host = h.get("x-forwarded-host") ?? h.get("host")
+  const proto = h.get("x-forwarded-proto") ?? "http"
+  const returnUrl = host ? `${proto}://${host}/dashboard/team` : undefined
+
+  const { link } = await workos.adminPortal.generateLink({
+    organization: organizationId,
+    intent,
+    returnUrl,
+  })
+
+  return { link }
 }
