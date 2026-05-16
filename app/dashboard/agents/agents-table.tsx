@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import {
   flexRender,
@@ -275,8 +275,26 @@ export function AgentsTable({ initialData }: { initialData: Agent[] }) {
   })
 
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [isCreating, startCreateTransition] = React.useTransition()
   const [isDeleting, startDeleteTransition] = React.useTransition()
+
+  // Open the New Agent dialog when navigated to with ?new=1 (e.g. from the sidebar).
+  React.useEffect(() => {
+    if (searchParams.get("new") === "1") {
+      setNewAgentDialogOpen(true)
+    }
+  }, [searchParams])
+
+  function closeNewAgentDialog() {
+    setNewAgentDialogOpen(false)
+    newAgentForm.reset()
+    setCapInput("")
+    if (searchParams.get("new")) {
+      router.replace(pathname)
+    }
+  }
 
   function onDeleteConfirm() {
     setDeleteError(null)
@@ -306,9 +324,7 @@ export function AgentsTable({ initialData }: { initialData: Agent[] }) {
     startCreateTransition(async () => {
       try {
         const agent = await createAgent(values)
-        setNewAgentDialogOpen(false)
-        newAgentForm.reset()
-        setCapInput("")
+        closeNewAgentDialog()
         toast.success(`${agent.name} created`, {
           description: "Configure your new agent below.",
         })
@@ -523,10 +539,10 @@ export function AgentsTable({ initialData }: { initialData: Agent[] }) {
       <Dialog
         open={newAgentDialogOpen}
         onOpenChange={(open) => {
-          setNewAgentDialogOpen(open)
           if (!open) {
-            newAgentForm.reset()
-            setCapInput("")
+            closeNewAgentDialog()
+          } else {
+            setNewAgentDialogOpen(true)
           }
         }}
       >
@@ -652,11 +668,7 @@ export function AgentsTable({ initialData }: { initialData: Agent[] }) {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => {
-                setNewAgentDialogOpen(false)
-                newAgentForm.reset()
-                setCapInput("")
-              }}
+              onClick={closeNewAgentDialog}
               disabled={isCreating}
             >
               Cancel
