@@ -27,6 +27,13 @@ import {
 } from "@/components/ui/card"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Table,
   TableBody,
   TableCell,
@@ -165,6 +172,7 @@ const KIND_DOT: Record<OperationKind, string> = {
 
 export function AuditLogView({ events }: { events: AuditEventRow[] }) {
   const [kindFilter, setKindFilter] = React.useState<OperationKind | "all">("all")
+  const [actorFilter, setActorFilter] = React.useState<string>("all")
   const [dateRange, setDateRange] = React.useState<DateRange | undefined>(undefined)
 
   const decorated = React.useMemo(
@@ -177,8 +185,19 @@ export function AuditLogView({ events }: { events: AuditEventRow[] }) {
     [events]
   )
 
+  const actors = React.useMemo(() => {
+    const map = new Map<string, { email: string; name: string; count: number }>()
+    for (const e of events) {
+      const existing = map.get(e.actorEmail)
+      if (existing) existing.count += 1
+      else map.set(e.actorEmail, { email: e.actorEmail, name: e.actorName, count: 1 })
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [events])
+
   const filtered = decorated.filter((event) => {
     if (kindFilter !== "all" && event.meta.kind !== kindFilter) return false
+    if (actorFilter !== "all" && event.actorEmail !== actorFilter) return false
     if (dateRange?.from) {
       const start = new Date(dateRange.from)
       start.setHours(0, 0, 0, 0)
@@ -239,16 +258,36 @@ export function AuditLogView({ events }: { events: AuditEventRow[] }) {
             })}
           </div>
 
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className={cn(
-                  "h-8 justify-start gap-2 text-xs font-normal",
-                  !dateRange && "text-muted-foreground"
-                )}
-              >
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Select value={actorFilter} onValueChange={setActorFilter}>
+              <SelectTrigger size="sm" className="h-8 w-full text-xs sm:w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All users ({events.length})</SelectItem>
+                {actors.map((a) => (
+                  <SelectItem key={a.email} value={a.email}>
+                    <span className="flex flex-col items-start">
+                      <span>{a.name}</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {a.email} · {a.count}
+                      </span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={cn(
+                    "h-8 justify-start gap-2 text-xs font-normal",
+                    !dateRange && "text-muted-foreground"
+                  )}
+                >
                 <CalendarIcon className="size-3.5" />
                 {dateRange?.from ? (
                   dateRange.to ? (
@@ -286,6 +325,7 @@ export function AuditLogView({ events }: { events: AuditEventRow[] }) {
               />
             </PopoverContent>
           </Popover>
+          </div>
         </div>
 
         <Card>
