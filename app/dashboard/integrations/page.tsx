@@ -1,99 +1,63 @@
 import Image from "next/image"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { withAuth } from "@workos-inc/authkit-nextjs"
 import { CheckCircle2Icon, PlusIcon } from "lucide-react"
 
-const integrations = [
-  {
-    name: "Google Workspace",
-    description: "Sync calendars, contacts, Drive files, and Gmail into your workflow.",
-    category: "Productivity",
-    icon: "/icons/google.svg",
-    connected: true,
-  },
-  {
-    name: "Jira",
-    description: "Import issues, sprints, and project boards from Jira automatically.",
-    category: "Project Management",
-    icon: "/icons/jira.svg",
-    connected: true,
-  },
-  {
-    name: "Slack",
-    description: "Send notifications and receive updates directly in your Slack channels.",
-    category: "Communication",
-    icon: "/icons/slack.svg",
-    connected: false,
-  },
-  {
-    name: "GitHub",
-    description: "Link pull requests, issues, and commits to your projects and tasks.",
-    category: "Engineering",
-    icon: "/icons/github.svg",
-    connected: false,
-  },
-  {
-    name: "Notion",
-    description: "Keep your Notion pages and databases in sync with your workspace.",
-    category: "Productivity",
-    icon: "/icons/notion.svg",
-    connected: false,
-  },
-  {
-    name: "Salesforce",
-    description: "Pull CRM records, deals, and contacts into your dashboard.",
-    category: "CRM",
-    icon: "/icons/salesforce.svg",
-    connected: false,
-  },
-  {
-    name: "HubSpot",
-    description: "Sync contacts, companies, and pipeline data from HubSpot.",
-    category: "CRM",
-    icon: "/icons/hubspot.svg",
-    connected: false,
-  },
-  {
-    name: "Linear",
-    description: "Surface Linear issues and cycles alongside your project timelines.",
-    category: "Project Management",
-    icon: "/icons/linear.svg",
-    connected: false,
-  },
-  {
-    name: "Microsoft 365",
-    description: "Connect Teams, Outlook, and OneDrive to unify your collaboration.",
-    category: "Productivity",
-    icon: "/icons/microsoft365.svg",
-    connected: false,
-  },
-  {
-    name: "Zapier",
-    description: "Automate workflows by connecting to thousands of apps via Zapier.",
-    category: "Automation",
-    icon: "/icons/zapier.svg",
-    connected: false,
-  },
-  {
-    name: "Asana",
-    description: "Bring Asana tasks and timelines into your unified project view.",
-    category: "Project Management",
-    icon: "/icons/asana.svg",
-    connected: false,
-  },
-  {
-    name: "Stripe",
-    description: "Monitor payments, subscriptions, and revenue metrics in real time.",
-    category: "Finance",
-    icon: "/icons/stripe.svg",
-    connected: false,
-  },
-]
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { prisma } from "@/lib/prisma"
 
-export default function IntegrationsPage() {
-  const connected = integrations.filter((i) => i.connected)
-  const available = integrations.filter((i) => !i.connected)
+import { DisconnectButton } from "./disconnect-button"
+
+// Static catalog: visual rows for the page. The `id` matches a key in
+// lib/integrations/providers.ts when OAuth has been wired (currently: github).
+const catalog = [
+  { id: null, name: "Google Workspace", description: "Sync calendars, contacts, Drive files, and Gmail into your workflow.", category: "Productivity", icon: "/icons/google.svg" },
+  { id: null, name: "Jira", description: "Import issues, sprints, and project boards from Jira automatically.", category: "Project Management", icon: "/icons/jira.svg" },
+  { id: null, name: "Slack", description: "Send notifications and receive updates directly in your Slack channels.", category: "Communication", icon: "/icons/slack.svg" },
+  { id: "github", name: "GitHub", description: "Link pull requests, issues, and commits to your projects and tasks.", category: "Engineering", icon: "/icons/github.svg" },
+  { id: null, name: "Notion", description: "Keep your Notion pages and databases in sync with your workspace.", category: "Productivity", icon: "/icons/notion.svg" },
+  { id: null, name: "Salesforce", description: "Pull CRM records, deals, and contacts into your dashboard.", category: "CRM", icon: "/icons/salesforce.svg" },
+  { id: null, name: "HubSpot", description: "Sync contacts, companies, and pipeline data from HubSpot.", category: "CRM", icon: "/icons/hubspot.svg" },
+  { id: null, name: "Linear", description: "Surface Linear issues and cycles alongside your project timelines.", category: "Project Management", icon: "/icons/linear.svg" },
+  { id: null, name: "Microsoft 365", description: "Connect Teams, Outlook, and OneDrive to unify your collaboration.", category: "Productivity", icon: "/icons/microsoft365.svg" },
+  { id: null, name: "Zapier", description: "Automate workflows by connecting to thousands of apps via Zapier.", category: "Automation", icon: "/icons/zapier.svg" },
+  { id: null, name: "Asana", description: "Bring Asana tasks and timelines into your unified project view.", category: "Project Management", icon: "/icons/asana.svg" },
+  { id: null, name: "Stripe", description: "Monitor payments, subscriptions, and revenue metrics in real time.", category: "Finance", icon: "/icons/stripe.svg" },
+] as const
+
+type Connection = {
+  id: string
+  accountLogin: string | null
+  accountName: string | null
+}
+
+export default async function IntegrationsPage() {
+  const { organizationId } = await withAuth({ ensureSignedIn: true })
+  const connections = organizationId
+    ? await prisma.integrationConnection.findMany({
+        where: { organizationId },
+        select: { id: true, providerId: true, accountLogin: true, accountName: true },
+      })
+    : []
+
+  const byProvider = new Map<string, Connection>()
+  for (const c of connections) byProvider.set(c.providerId, c)
+
+  const decorated = catalog.map((row) => ({
+    ...row,
+    connection: row.id ? (byProvider.get(row.id) ?? null) : null,
+    wired: row.id !== null,
+  }))
+
+  const connected = decorated.filter((r) => r.connection)
+  const available = decorated.filter((r) => !r.connection)
 
   return (
     <div className="@container/main flex flex-1 flex-col gap-2">
@@ -111,8 +75,8 @@ export default function IntegrationsPage() {
               Connected ({connected.length})
             </h2>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {connected.map((integration) => (
-                <IntegrationCard key={integration.name} integration={integration} />
+              {connected.map((row) => (
+                <IntegrationCard key={row.name} row={row} />
               ))}
             </div>
           </section>
@@ -123,8 +87,8 @@ export default function IntegrationsPage() {
             Available ({available.length})
           </h2>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {available.map((integration) => (
-              <IntegrationCard key={integration.name} integration={integration} />
+            {available.map((row) => (
+              <IntegrationCard key={row.name} row={row} />
             ))}
           </div>
         </section>
@@ -134,17 +98,25 @@ export default function IntegrationsPage() {
 }
 
 function IntegrationCard({
-  integration,
+  row,
 }: {
-  integration: (typeof integrations)[number]
+  row: {
+    id: string | null
+    name: string
+    description: string
+    category: string
+    icon: string
+    connection: Connection | null
+    wired: boolean
+  }
 }) {
   return (
     <Card className="flex flex-col">
       <CardHeader className="flex flex-row items-start gap-3 space-y-0 pb-2">
         <div className="flex size-10 shrink-0 items-center justify-center rounded-md border bg-white p-1.5 dark:bg-white/5">
           <Image
-            src={integration.icon}
-            alt={integration.name}
+            src={row.icon}
+            alt={row.name}
             width={28}
             height={28}
             className="object-contain"
@@ -152,34 +124,37 @@ function IntegrationCard({
         </div>
         <div className="flex flex-1 flex-col gap-1 min-w-0">
           <div className="flex items-center gap-2">
-            <CardTitle className="text-sm">{integration.name}</CardTitle>
-            {integration.connected && (
+            <CardTitle className="text-sm">{row.name}</CardTitle>
+            {row.connection && (
               <CheckCircle2Icon className="size-3.5 shrink-0 text-green-500" />
             )}
           </div>
           <Badge variant="outline" className="w-fit text-[10px]">
-            {integration.category}
+            {row.category}
           </Badge>
         </div>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col justify-between gap-4 pt-0">
         <CardDescription className="text-xs leading-relaxed">
-          {integration.description}
+          {row.connection?.accountLogin
+            ? `Connected as @${row.connection.accountLogin}.`
+            : row.description}
         </CardDescription>
-        <Button
-          size="sm"
-          variant={integration.connected ? "outline" : "default"}
-          className="w-full"
-        >
-          {integration.connected ? (
-            "Disconnect"
-          ) : (
-            <>
+
+        {row.connection ? (
+          <DisconnectButton connectionId={row.connection.id} providerName={row.name} />
+        ) : row.wired && row.id ? (
+          <Button size="sm" variant="default" className="w-full" asChild>
+            <a href={`/api/integrations/${row.id}/connect`}>
               <PlusIcon />
               Connect
-            </>
-          )}
-        </Button>
+            </a>
+          </Button>
+        ) : (
+          <Button size="sm" variant="outline" className="w-full" disabled>
+            Coming soon
+          </Button>
+        )}
       </CardContent>
     </Card>
   )

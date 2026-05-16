@@ -43,6 +43,24 @@ model Agent {
   @@index([organizationId])
 }
 
+model IntegrationConnection {
+  id              String    @id @default(cuid())
+  organizationId  String
+  providerId      String
+  accessToken     String
+  refreshToken    String?
+  tokenExpiresAt  DateTime?
+  scope           String?
+  accountId       String?
+  accountLogin    String?
+  accountName     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([organizationId, providerId, accountId])
+  @@index([organizationId])
+}
+
 model Log {
   id         Int      @id @default(autoincrement())
   agentId    Int
