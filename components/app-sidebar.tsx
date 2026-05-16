@@ -15,7 +15,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { LayoutDashboardIcon, ListIcon, ChartBarIcon, FolderIcon, BotIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, PlugZapIcon } from "lucide-react"
+import { LayoutDashboardIcon, ListIcon, ChartBarIcon, FolderIcon, BotIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, PlugZapIcon, UsersIcon } from "lucide-react"
 
 const data = {
   user: {
@@ -69,6 +69,14 @@ const data = {
       url: "/dashboard/integrations",
       icon: (
         <PlugZapIcon
+        />
+      ),
+    },
+    {
+      title: "Team",
+      url: "/dashboard/team",
+      icon: (
+        <UsersIcon
         />
       ),
     },
