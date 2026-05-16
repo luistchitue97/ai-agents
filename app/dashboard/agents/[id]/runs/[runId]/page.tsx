@@ -9,6 +9,9 @@ import {
   CircleDashedIcon,
   CircleXIcon,
   Loader2Icon,
+  MessageSquareIcon,
+  SparklesIcon,
+  WrenchIcon,
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -55,6 +58,14 @@ function formatDuration(start: Date, end: Date | null): string {
   return `${min}m ${sec}s`
 }
 
+function safeStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return String(value)
+  }
+}
+
 export default async function AgentRunPage({
   params,
 }: {
@@ -80,15 +91,57 @@ export default async function AgentRunPage({
   if (!run) notFound()
 
   const meta = statusMeta[run.status]
-  const promptStep = run.steps.find((s) => s.kind === "prompt")
-  const responseStep = run.steps.find((s) => s.kind === "response")
   const errorStep = run.steps.find((s) => s.kind === "error")
-  const usage =
-    responseStep?.toolOutput &&
-    typeof responseStep.toolOutput === "object" &&
-    !Array.isArray(responseStep.toolOutput)
-      ? (responseStep.toolOutput as Record<string, unknown>)
-      : null
+
+  // Token usage is stashed on any of the response steps (we updateMany at the end).
+  const responseSteps = run.steps.filter((s) => s.kind === "response")
+  const lastResponseWithUsage = [...responseSteps].reverse().find(
+    (s) =>
+      s.toolOutput &&
+      typeof s.toolOutput === "object" &&
+      !Array.isArray(s.toolOutput) &&
+      "inputTokens" in (s.toolOutput as Record<string, unknown>)
+  )
+  const usage = lastResponseWithUsage?.toolOutput as
+    | Record<string, number>
+    | undefined
+
+  // Pair up tool_call + tool_result for the timeline (same toolName, adjacent sequences).
+  const timeline: TimelineRow[] = []
+  for (let i = 0; i < run.steps.length; i++) {
+    const step = run.steps[i]
+    if (step.kind === "prompt") {
+      timeline.push({ kind: "prompt", content: step.content })
+    } else if (step.kind === "response") {
+      if (step.content && step.content.trim().length > 0) {
+        timeline.push({ kind: "response", content: step.content })
+      }
+    } else if (step.kind === "tool_call") {
+      // Look ahead for the matching tool_result.
+      const next = run.steps[i + 1]
+      const paired =
+        next && next.kind === "tool_result" && next.toolName === step.toolName
+          ? next
+          : null
+      timeline.push({
+        kind: "tool",
+        toolName: step.toolName ?? "(unknown)",
+        input: step.toolInput,
+        output: paired?.toolOutput ?? null,
+        hasResult: Boolean(paired),
+      })
+      if (paired) i += 1 // skip the result; we consumed it
+    } else if (step.kind === "tool_result") {
+      // Orphan tool_result (no preceding call). Render as a row anyway.
+      timeline.push({
+        kind: "tool",
+        toolName: step.toolName ?? "(unknown)",
+        input: null,
+        output: step.toolOutput,
+        hasResult: true,
+      })
+    }
+  }
 
   return (
     <div className="@container/main flex flex-1 flex-col gap-2">
@@ -137,7 +190,7 @@ export default async function AgentRunPage({
             <CardHeader>
               <CardTitle className="text-base">Summary</CardTitle>
               <CardDescription>
-                The model&apos;s final output for this run.
+                The model&apos;s final answer for this run.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -165,20 +218,19 @@ export default async function AgentRunPage({
           </Card>
         )}
 
-        {/* Prompt */}
-        {promptStep && (
+        {/* Timeline */}
+        {timeline.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Prompt sent to the model</CardTitle>
+              <CardTitle className="text-base">Timeline</CardTitle>
               <CardDescription>
-                What this agent saw when it ran. Phase 2 stuffs context inline;
-                Phase 3 will swap this for tool calls.
+                What the model thought and which tools it called, in order.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <pre className="max-h-96 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-muted px-3 py-2 font-mono text-xs leading-relaxed">
-                {promptStep.content}
-              </pre>
+            <CardContent className="flex flex-col gap-3 pt-0">
+              {timeline.map((row, i) => (
+                <TimelineEntry key={i} row={row} />
+              ))}
             </CardContent>
           </Card>
         )}
@@ -206,11 +258,11 @@ export default async function AgentRunPage({
             {usage && (
               <>
                 <Row
-                  label="Input tokens"
+                  label="Total input tokens"
                   value={String(usage.inputTokens ?? "—")}
                 />
                 <Row
-                  label="Output tokens"
+                  label="Total output tokens"
                   value={String(usage.outputTokens ?? "—")}
                 />
                 {Number(usage.cacheReadTokens ?? 0) > 0 && (
@@ -225,6 +277,88 @@ export default async function AgentRunPage({
         </Card>
       </div>
     </div>
+  )
+}
+
+type TimelineRow =
+  | { kind: "prompt"; content: string | null }
+  | { kind: "response"; content: string }
+  | {
+      kind: "tool"
+      toolName: string
+      input: unknown
+      output: unknown
+      hasResult: boolean
+    }
+
+function TimelineEntry({ row }: { row: TimelineRow }) {
+  if (row.kind === "prompt") {
+    return (
+      <details className="group rounded-md border bg-muted/30">
+        <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-xs font-medium">
+          <MessageSquareIcon className="size-3.5 text-muted-foreground" />
+          Initial prompt
+          <span className="ml-auto text-[10px] text-muted-foreground group-open:hidden">
+            Click to expand
+          </span>
+        </summary>
+        <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap break-words border-t px-3 py-2 font-mono text-[11px] leading-relaxed">
+          {row.content}
+        </pre>
+      </details>
+    )
+  }
+
+  if (row.kind === "response") {
+    return (
+      <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2.5">
+        <div className="flex items-center gap-2 pb-1.5 text-xs font-medium text-primary">
+          <SparklesIcon className="size-3.5" />
+          Assistant
+        </div>
+        <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed">
+          {row.content}
+        </pre>
+      </div>
+    )
+  }
+
+  // tool
+  return (
+    <details className="group rounded-md border">
+      <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-xs font-medium">
+        <WrenchIcon className="size-3.5 text-muted-foreground" />
+        <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
+          {row.toolName}
+        </code>
+        {!row.hasResult && (
+          <Badge variant="destructive" className="text-[10px]">
+            no result
+          </Badge>
+        )}
+        <span className="ml-auto text-[10px] text-muted-foreground group-open:hidden">
+          Click to expand
+        </span>
+      </summary>
+      <div className="grid gap-2 border-t px-3 py-2 sm:grid-cols-2">
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Input
+          </span>
+          <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap break-words rounded bg-muted px-2 py-1.5 font-mono text-[10px] leading-relaxed">
+            {row.input ? safeStringify(row.input) : "—"}
+          </pre>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Output
+          </span>
+          <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap break-words rounded bg-muted px-2 py-1.5 font-mono text-[10px] leading-relaxed">
+            {row.output ? safeStringify(row.output) : "—"}
+          </pre>
+        </div>
+      </div>
+    </details>
   )
 }
 

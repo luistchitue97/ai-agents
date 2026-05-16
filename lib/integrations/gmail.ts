@@ -16,6 +16,18 @@ export type GmailMessageSummary = {
   snippet: string | null
 }
 
+export type GmailMessageDetail = GmailMessageSummary & {
+  to: string | null
+  body: string | null
+  bodyTruncated: boolean
+}
+
+type MessagePart = {
+  mimeType?: string
+  body?: { data?: string; size?: number }
+  parts?: MessagePart[]
+}
+
 export class GmailReconnectRequired extends Error {
   constructor(message = "This Gmail connection needs to be reconnected.") {
     super(message)
@@ -94,7 +106,7 @@ async function callGmail<T>(
 
 export async function fetchRecentMessages(
   organizationId: string,
-  options: { maxResults?: number } = {}
+  options: { maxResults?: number; query?: string } = {}
 ): Promise<GmailMessageSummary[]> {
   const maxResults = Math.min(50, Math.max(1, options.maxResults ?? 10))
 
@@ -105,10 +117,14 @@ export async function fetchRecentMessages(
     throw new GmailReconnectRequired("Gmail is not connected for this organization.")
   }
 
+  const queryParam = options.query?.trim()
+    ? `&q=${encodeURIComponent(options.query.trim())}`
+    : ""
+
   type ListResponse = { messages?: { id: string }[] }
   const list = await callGmail<ListResponse>(
     connection,
-    `/messages?maxResults=${maxResults}`
+    `/messages?maxResults=${maxResults}${queryParam}`
   )
   const ids = list.messages?.map((m) => m.id) ?? []
   if (ids.length === 0) return []
@@ -141,4 +157,90 @@ export async function fetchRecentMessages(
       snippet: m.snippet ?? null,
     }
   })
+}
+
+// Cap how much body text we hand back to the model. Long marketing emails would
+// otherwise burn through context for almost no signal.
+const MAX_BODY_CHARS = 8000
+
+function extractBody(part: MessagePart, mimeType: string): string | null {
+  if (part.mimeType === mimeType && part.body?.data) {
+    return Buffer.from(part.body.data, "base64url").toString("utf8")
+  }
+  if (part.parts) {
+    for (const child of part.parts) {
+      const found = extractBody(child, mimeType)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+export async function fetchMessageBody(
+  organizationId: string,
+  messageId: string
+): Promise<GmailMessageDetail> {
+  const connection = await prisma.integrationConnection.findFirst({
+    where: { organizationId, providerId: "gmail" },
+  })
+  if (!connection) {
+    throw new GmailReconnectRequired("Gmail is not connected for this organization.")
+  }
+
+  type MessageResponse = {
+    id: string
+    snippet?: string
+    payload?: MessagePart & { headers?: { name: string; value: string }[] }
+  }
+  const m = await callGmail<MessageResponse>(
+    connection,
+    `/messages/${encodeURIComponent(messageId)}?format=full`
+  )
+
+  const headers = new Map(
+    (m.payload?.headers ?? []).map((h) => [h.name.toLowerCase(), h.value])
+  )
+
+  let body: string | null = null
+  if (m.payload) {
+    const plain = extractBody(m.payload, "text/plain")
+    if (plain) {
+      body = plain.trim()
+    } else {
+      const html = extractBody(m.payload, "text/html")
+      if (html) body = stripHtml(html)
+    }
+  }
+
+  let truncated = false
+  if (body && body.length > MAX_BODY_CHARS) {
+    body = body.slice(0, MAX_BODY_CHARS)
+    truncated = true
+  }
+
+  return {
+    id: m.id,
+    from: headers.get("from") ?? null,
+    to: headers.get("to") ?? null,
+    subject: headers.get("subject") ?? null,
+    date: headers.get("date") ?? null,
+    snippet: m.snippet ?? null,
+    body,
+    bodyTruncated: truncated,
+  }
 }
