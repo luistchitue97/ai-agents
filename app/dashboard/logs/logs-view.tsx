@@ -7,6 +7,10 @@ import {
   BotIcon,
   CalendarIcon,
   CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ChevronsLeftIcon,
+  ChevronsRightIcon,
   MailIcon,
   PlugZapIcon,
   ShieldCheckIcon,
@@ -173,10 +177,18 @@ const KIND_DOT: Record<OperationKind, string> = {
   delete: "bg-red-500",
 }
 
+const PAGE_SIZE = 10
+
 export function AuditLogView({ events }: { events: AuditEventRow[] }) {
   const [kindFilter, setKindFilter] = React.useState<OperationKind | "all">("all")
   const [actorFilter, setActorFilter] = React.useState<string>("all")
   const [dateRange, setDateRange] = React.useState<DateRange | undefined>(undefined)
+  const [pageIndex, setPageIndex] = React.useState(0)
+
+  // Reset to first page whenever filters change.
+  React.useEffect(() => {
+    setPageIndex(0)
+  }, [kindFilter, actorFilter, dateRange])
 
   const decorated = React.useMemo(
     () =>
@@ -216,6 +228,18 @@ export function AuditLogView({ events }: { events: AuditEventRow[] }) {
 
   const countByKind = (kind: OperationKind) =>
     decorated.filter((e) => e.meta.kind === kind).length
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePageIndex = Math.min(pageIndex, pageCount - 1)
+  // If the current page is now beyond the end (e.g. last item on page 3 was filtered out), pull back.
+  if (safePageIndex !== pageIndex) {
+    // setState during render is fine here — React will re-render with the clamped value next tick.
+    queueMicrotask(() => setPageIndex(safePageIndex))
+  }
+  const pageStart = safePageIndex * PAGE_SIZE
+  const paged = filtered.slice(pageStart, pageStart + PAGE_SIZE)
+  const canPrev = safePageIndex > 0
+  const canNext = safePageIndex < pageCount - 1
 
   return (
     <div className="@container/main flex flex-1 flex-col gap-2">
@@ -337,7 +361,7 @@ export function AuditLogView({ events }: { events: AuditEventRow[] }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.length === 0 ? (
+                {paged.length === 0 ? (
                   <TableRow>
                     <TableCell
                       colSpan={4}
@@ -347,7 +371,7 @@ export function AuditLogView({ events }: { events: AuditEventRow[] }) {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((event) => {
+                  paged.map((event) => {
                     const details = renderDetails(event.action, event.metadata)
                     return (
                       <TableRow key={event.id}>
@@ -409,9 +433,64 @@ export function AuditLogView({ events }: { events: AuditEventRow[] }) {
           </CardContent>
         </Card>
 
-        <p className="text-center text-xs text-muted-foreground">
-          Showing {filtered.length} of {events.length} entries
-        </p>
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-xs text-muted-foreground">
+            {filtered.length === 0
+              ? "No entries"
+              : `Showing ${pageStart + 1}–${pageStart + paged.length} of ${filtered.length}${
+                  filtered.length !== events.length ? ` (filtered from ${events.length})` : ""
+                }`}
+          </p>
+          <div className="flex items-center gap-4">
+            <span className="text-xs font-medium">
+              Page {safePageIndex + 1} of {pageCount}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                className="hidden size-8 lg:flex"
+                onClick={() => setPageIndex(0)}
+                disabled={!canPrev}
+                aria-label="Go to first page"
+              >
+                <ChevronsLeftIcon />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="size-8"
+                onClick={() => setPageIndex((i) => Math.max(0, i - 1))}
+                disabled={!canPrev}
+                aria-label="Go to previous page"
+              >
+                <ChevronLeftIcon />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="size-8"
+                onClick={() =>
+                  setPageIndex((i) => Math.min(pageCount - 1, i + 1))
+                }
+                disabled={!canNext}
+                aria-label="Go to next page"
+              >
+                <ChevronRightIcon />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="hidden size-8 lg:flex"
+                onClick={() => setPageIndex(pageCount - 1)}
+                disabled={!canNext}
+                aria-label="Go to last page"
+              >
+                <ChevronsRightIcon />
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )
