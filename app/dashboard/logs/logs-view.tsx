@@ -6,11 +6,13 @@ import type { DateRange } from "react-day-picker"
 import {
   BotIcon,
   CalendarIcon,
+  CheckIcon,
   MailIcon,
   PlugZapIcon,
   ShieldCheckIcon,
   UserMinusIcon,
   UserPlusIcon,
+  UsersIcon,
   XIcon,
 } from "lucide-react"
 
@@ -25,14 +27,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
   Table,
   TableBody,
@@ -259,24 +262,12 @@ export function AuditLogView({ events }: { events: AuditEventRow[] }) {
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <Select value={actorFilter} onValueChange={setActorFilter}>
-              <SelectTrigger size="sm" className="h-8 w-full text-xs sm:w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All users ({events.length})</SelectItem>
-                {actors.map((a) => (
-                  <SelectItem key={a.email} value={a.email}>
-                    <span className="flex flex-col items-start">
-                      <span>{a.name}</span>
-                      <span className="text-[10px] text-muted-foreground">
-                        {a.email} · {a.count}
-                      </span>
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <UserFilterCommand
+              actors={actors}
+              totalEvents={events.length}
+              value={actorFilter}
+              onChange={setActorFilter}
+            />
 
             <Popover>
               <PopoverTrigger asChild>
@@ -423,5 +414,108 @@ export function AuditLogView({ events }: { events: AuditEventRow[] }) {
         </p>
       </div>
     </div>
+  )
+}
+
+type Actor = { email: string; name: string; count: number }
+
+function UserFilterCommand({
+  actors,
+  totalEvents,
+  value,
+  onChange,
+}: {
+  actors: Actor[]
+  totalEvents: number
+  value: string
+  onChange: (next: string) => void
+}) {
+  const [open, setOpen] = React.useState(false)
+  const selected = value === "all" ? null : actors.find((a) => a.email === value)
+
+  function pick(next: string) {
+    onChange(next)
+    setOpen(false)
+  }
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setOpen(true)}
+        className="h-8 justify-start gap-2 text-xs font-normal sm:w-56"
+      >
+        <UsersIcon className="size-3.5" />
+        {selected ? (
+          <span className="truncate">{selected.name}</span>
+        ) : (
+          <span className="text-muted-foreground">All users ({totalEvents})</span>
+        )}
+      </Button>
+
+      <CommandDialog open={open} onOpenChange={setOpen}>
+        <CommandInput placeholder="Search users by name or email..." />
+        <CommandList>
+          <CommandEmpty>No users match your search.</CommandEmpty>
+          <CommandGroup>
+            <CommandItem
+              value="all users"
+              onSelect={() => pick("all")}
+              className="flex items-center gap-3"
+            >
+              <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted">
+                <UsersIcon className="size-3.5 text-muted-foreground" />
+              </div>
+              <div className="flex flex-1 flex-col">
+                <span className="text-sm font-medium">All users</span>
+                <span className="text-xs text-muted-foreground">
+                  Show events from everyone
+                </span>
+              </div>
+              <span className="text-xs text-muted-foreground">{totalEvents}</span>
+              {value === "all" && <CheckIcon className="ml-1 size-4" />}
+            </CommandItem>
+          </CommandGroup>
+          {actors.length > 0 && (
+            <CommandGroup heading="Users">
+              {actors.map((actor) => (
+                <CommandItem
+                  key={actor.email}
+                  value={`${actor.name} ${actor.email}`}
+                  onSelect={() => pick(actor.email)}
+                  className="flex items-center gap-3"
+                >
+                  <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/10">
+                    <span className="text-[10px] font-medium text-primary">
+                      {actor.name
+                        .split(/\s+/)
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map((p) => p[0]?.toUpperCase() ?? "")
+                        .join("")}
+                    </span>
+                  </div>
+                  <div className="flex flex-1 flex-col min-w-0">
+                    <span className="text-sm font-medium truncate">
+                      {actor.name}
+                    </span>
+                    <span className="line-clamp-1 text-xs text-muted-foreground">
+                      {actor.email}
+                    </span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {actor.count}
+                  </span>
+                  {value === actor.email && (
+                    <CheckIcon className="ml-1 size-4" />
+                  )}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+        </CommandList>
+      </CommandDialog>
+    </>
   )
 }
