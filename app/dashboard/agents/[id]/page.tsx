@@ -8,7 +8,6 @@ import {
   ScrollTextIcon,
   PauseIcon,
   PlayIcon,
-  SaveIcon,
   Trash2Icon,
 } from "lucide-react"
 
@@ -36,6 +35,8 @@ import { integrationProviders } from "@/lib/integrations/providers"
 import { prisma } from "@/lib/prisma"
 
 import { formatLastActive, MODELS, type AgentStatus } from "../data"
+import { RecentRunsCard } from "./recent-runs-card"
+import { RunNowButton } from "./run-now-button"
 import { ToolsCard, type ToolOption } from "./tools-card"
 
 const statusConfig: Record<AgentStatus, { label: string; className: string }> = {
@@ -99,6 +100,20 @@ export default async function AgentConfigPage({
 
   const initialSelected = row.connections.map((c) => c.integrationConnectionId)
 
+  const recentRuns = await prisma.agentRun.findMany({
+    where: { agentId: row.id, organizationId },
+    orderBy: { createdAt: "desc" },
+    take: 5,
+    select: {
+      id: true,
+      status: true,
+      startedAt: true,
+      finishedAt: true,
+      summary: true,
+      triggeredByName: true,
+    },
+  })
+
   return (
     <div className="@container/main flex flex-1 flex-col gap-2">
       <div className="flex flex-col gap-6 py-4 md:gap-6 md:py-6 px-4 lg:px-6">
@@ -149,10 +164,7 @@ export default async function AgentConfigPage({
                 <><PauseIcon />Pause</>
               )}
             </Button>
-            <Button size="sm">
-              <SaveIcon />
-              Save changes
-            </Button>
+            <RunNowButton agentId={agent.id} />
           </div>
         </div>
 
@@ -241,6 +253,9 @@ export default async function AgentConfigPage({
 
           {/* Sidebar info + danger */}
           <div className="flex flex-col gap-6">
+
+            {/* Recent runs */}
+            <RecentRunsCard agentId={agent.id} runs={recentRuns} />
 
             {/* Stats */}
             <Card>

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { Prisma } from "@prisma/client"
 import { z } from "zod"
 
+import { runAgent } from "@/lib/agent-runtime"
 import { logAudit } from "@/lib/audit"
 import { requireAdminContext, requireOrgContext } from "@/lib/auth"
 import { notifyOrg } from "@/lib/notifications"
@@ -160,4 +161,44 @@ export async function setAgentConnections(
 
   revalidatePath(`/dashboard/agents/${agent.id}`)
   return { connected: connectionIds.length }
+}
+
+/**
+ * Trigger a manual run of an agent. Any org member can run agents — the
+ * authorization for what the run can SEE comes from which connections the
+ * agent was wired to (admin decision, Phase 1).
+ *
+ * This call is synchronous: the action waits for Anthropic to respond before
+ * returning. Locally that's fine; in production we'd queue it.
+ */
+export async function runAgentNow(agentId: number) {
+  if (!Number.isInteger(agentId) || agentId <= 0) {
+    throw new Error("Invalid agent id.")
+  }
+  const { user, organizationId } = await requireOrgContext()
+
+  const actorName =
+    [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+    user.email.split("@")[0]
+
+  const result = await runAgent(agentId, organizationId, {
+    id: user.id,
+    name: actorName,
+    email: user.email,
+  })
+
+  // Bump the agent's lastActive + tasksCompleted on success so the listing reflects it.
+  if (result.status === "succeeded") {
+    await prisma.agent.update({
+      where: { id: agentId },
+      data: {
+        lastActive: new Date(),
+        tasksCompleted: { increment: 1 },
+      },
+    })
+  }
+
+  revalidatePath(`/dashboard/agents/${agentId}`)
+  revalidatePath("/dashboard/agents")
+  return result
 }

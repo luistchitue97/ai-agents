@@ -24,6 +24,21 @@ enum LogLevel {
   error
 }
 
+enum AgentRunStatus {
+  pending
+  running
+  succeeded
+  failed
+}
+
+enum AgentRunStepKind {
+  prompt
+  response
+  error
+  tool_call
+  tool_result
+}
+
 model Agent {
   id             Int         @id @default(autoincrement())
   organizationId String
@@ -39,6 +54,7 @@ model Agent {
   updatedAt      DateTime    @updatedAt
   logs           Log[]
   connections    AgentConnection[]
+  runs           AgentRun[]
 
   @@unique([organizationId, nameKey])
   @@index([organizationId])
@@ -72,6 +88,41 @@ model AgentConnection {
 
   @@id([agentId, integrationConnectionId])
   @@index([integrationConnectionId])
+}
+
+model AgentRun {
+  id               String         @id @default(cuid())
+  agentId          Int
+  organizationId   String
+  status           AgentRunStatus @default(pending)
+  triggeredById    String
+  triggeredByName  String
+  triggeredByEmail String
+  summary          String?
+  errorMessage     String?
+  startedAt        DateTime       @default(now())
+  finishedAt       DateTime?
+  createdAt        DateTime       @default(now())
+  agent            Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  steps            AgentRunStep[]
+
+  @@index([agentId, createdAt(sort: Desc)])
+  @@index([organizationId, createdAt(sort: Desc)])
+}
+
+model AgentRunStep {
+  id         String           @id @default(cuid())
+  runId      String
+  sequence   Int
+  kind       AgentRunStepKind
+  content    String?
+  toolName   String?
+  toolInput  Json?
+  toolOutput Json?
+  createdAt  DateTime         @default(now())
+  run        AgentRun         @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId, sequence])
 }
 
 model Log {
