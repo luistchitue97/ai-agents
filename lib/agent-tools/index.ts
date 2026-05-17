@@ -2,12 +2,14 @@ import "server-only"
 
 import { prisma } from "@/lib/prisma"
 
+import { githubToolModule } from "./github"
 import { gmailToolModule } from "./gmail"
 import type { ProviderToolModule, ToolDefinition } from "./types"
 
 export type { ToolDefinition } from "./types"
 
 const providerToolModules: Record<string, ProviderToolModule> = {
+  [githubToolModule.providerId]: githubToolModule,
   [gmailToolModule.providerId]: gmailToolModule,
 }
 
