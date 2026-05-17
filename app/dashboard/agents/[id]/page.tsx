@@ -37,6 +37,7 @@ import { prisma } from "@/lib/prisma"
 import { formatLastActive, MODELS, type AgentStatus } from "../data"
 import { RecentRunsCard } from "./recent-runs-card"
 import { RunNowButton } from "./run-now-button"
+import { ScheduleCard } from "./schedule-card"
 import { ToolsCard, type ToolOption } from "./tools-card"
 
 const statusConfig: Record<AgentStatus, { label: string; className: string }> = {
@@ -246,6 +247,18 @@ export default async function AgentConfigPage({
               agentId={agent.id}
               options={toolOptions}
               initialSelected={initialSelected}
+              isAdmin={isAdmin}
+            />
+
+            {/* Schedule */}
+            <ScheduleCard
+              agentId={agent.id}
+              initial={{
+                enabled: agent.scheduleEnabled,
+                cron: agent.cron,
+                timezone: agent.timezone,
+                nextRunAt: agent.nextRunAt,
+              }}
               isAdmin={isAdmin}
             />
 

@@ -9,6 +9,7 @@ import { logAudit } from "@/lib/audit"
 import { requireAdminContext, requireOrgContext } from "@/lib/auth"
 import { notifyOrg } from "@/lib/notifications"
 import { prisma } from "@/lib/prisma"
+import { evaluateCron } from "@/lib/scheduling"
 import { normalizeAgentName } from "./data"
 
 export async function deleteAgents(ids: number[]) {
@@ -201,4 +202,69 @@ export async function runAgentNow(agentId: number) {
   revalidatePath(`/dashboard/agents/${agentId}`)
   revalidatePath("/dashboard/agents")
   return result
+}
+
+const scheduleSchema = z
+  .object({
+    agentId: z.number().int().positive(),
+    enabled: z.boolean(),
+    cron: z.string().trim().max(120).optional().nullable(),
+    timezone: z.string().trim().min(1).max(60),
+  })
+  .refine(
+    (v) => !v.enabled || (typeof v.cron === "string" && v.cron.length > 0),
+    { message: "Cron is required when the schedule is enabled.", path: ["cron"] }
+  )
+
+/**
+ * Persist the agent's schedule. Admin-only. Validates the cron expression in
+ * the chosen timezone and stores the next fire time so the cron tick can pick
+ * the agent up.
+ */
+export async function setAgentSchedule(input: z.infer<typeof scheduleSchema>) {
+  const data = scheduleSchema.parse(input)
+  const { organizationId } = await requireAdminContext()
+
+  const agent = await prisma.agent.findFirst({
+    where: { id: data.agentId, organizationId },
+    select: { id: true, name: true },
+  })
+  if (!agent) throw new Error("Agent not found in this organization.")
+
+  let nextRunAt: Date | null = null
+  if (data.enabled && data.cron) {
+    const result = evaluateCron(data.cron, data.timezone)
+    if (!result.ok) {
+      throw new Error(`Invalid cron expression: ${result.error}`)
+    }
+    nextRunAt = result.nextRunAt
+  }
+
+  await prisma.agent.update({
+    where: { id: agent.id },
+    data: {
+      cron: data.cron && data.cron.length > 0 ? data.cron : null,
+      timezone: data.timezone,
+      scheduleEnabled: data.enabled,
+      nextRunAt,
+    },
+  })
+
+  await logAudit({
+    action: "agent.configured",
+    targetType: "agent",
+    targetId: String(agent.id),
+    targetLabel: agent.name,
+    metadata: {
+      schedule: {
+        enabled: data.enabled,
+        cron: data.cron ?? null,
+        timezone: data.timezone,
+        nextRunAt: nextRunAt?.toISOString() ?? null,
+      },
+    },
+  })
+
+  revalidatePath(`/dashboard/agents/${agent.id}`)
+  return { enabled: data.enabled, nextRunAt: nextRunAt?.toISOString() ?? null }
 }

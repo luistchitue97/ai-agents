@@ -40,24 +40,30 @@ enum AgentRunStepKind {
 }
 
 model Agent {
-  id             Int         @id @default(autoincrement())
-  organizationId String
-  name           String
-  nameKey        String
-  description    String
-  model          String
-  status         AgentStatus @default(idle)
-  tasksCompleted Int         @default(0)
-  lastActive     DateTime    @default(now())
-  capabilities   String[]
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-  logs           Log[]
-  connections    AgentConnection[]
-  runs           AgentRun[]
+  id              Int         @id @default(autoincrement())
+  organizationId  String
+  name            String
+  nameKey         String
+  description     String
+  model           String
+  status          AgentStatus @default(idle)
+  tasksCompleted  Int         @default(0)
+  lastActive      DateTime    @default(now())
+  capabilities    String[]
+  // Scheduling (Phase 4). cron is a 5-field cron expression interpreted in `timezone`.
+  cron            String?
+  timezone        String      @default("UTC")
+  scheduleEnabled Boolean     @default(false)
+  nextRunAt       DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  logs            Log[]
+  connections     AgentConnection[]
+  runs            AgentRun[]
 
   @@unique([organizationId, nameKey])
   @@index([organizationId])
+  @@index([scheduleEnabled, nextRunAt])
 }
 
 model IntegrationConnection {
