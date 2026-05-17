@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import { after } from "next/server"
 
 import { runAgent } from "@/lib/agent-runtime"
+import { notifyAdmins } from "@/lib/notifications"
 import { prisma } from "@/lib/prisma"
 
 // Give the agent loop room to breathe (default Vercel function timeout is 60s).
@@ -43,7 +44,7 @@ export async function POST(
 
   const agent = await prisma.agent.findUnique({
     where: { id: agentId },
-    select: { id: true, organizationId: true },
+    select: { id: true, organizationId: true, name: true },
   })
   if (!agent) {
     return NextResponse.json({ error: "Agent not found." }, { status: 404 })
@@ -69,9 +70,36 @@ export async function POST(
   // Vercel keeps the function alive long enough to complete it.
   after(async () => {
     try {
-      await runAgent(agent.id, agent.organizationId, SYSTEM_ACTOR)
+      const result = await runAgent(agent.id, agent.organizationId, SYSTEM_ACTOR)
+      if (result.status === "succeeded") {
+        // Mirror the manual-trigger path so the agent listing reflects activity.
+        await prisma.agent.update({
+          where: { id: agent.id },
+          data: {
+            lastActive: new Date(),
+            tasksCompleted: { increment: 1 },
+          },
+        })
+      } else {
+        const failedRun = await prisma.agentRun.findUnique({
+          where: { id: result.runId },
+          select: { errorMessage: true },
+        })
+        await notifyAdmins(agent.organizationId, {
+          type: "agent.run_failed",
+          title: `Scheduled run failed: ${agent.name}`,
+          body: failedRun?.errorMessage ?? "The scheduled run did not complete.",
+          link: `/dashboard/agents/${agent.id}`,
+        })
+      }
     } catch (err) {
       console.error(`[scheduler] runAgent threw for agent ${agent.id}:`, err)
+      await notifyAdmins(agent.organizationId, {
+        type: "agent.run_failed",
+        title: `Scheduled run failed: ${agent.name}`,
+        body: err instanceof Error ? err.message : "The scheduled run threw an unexpected error.",
+        link: `/dashboard/agents/${agent.id}`,
+      })
     }
   })
 

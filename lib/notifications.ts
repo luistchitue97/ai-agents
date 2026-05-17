@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma"
 
 export type NotificationKind =
   | "agent.created"
+  | "agent.run_failed"
   | "integration.connected"
   | "member.role_changed"
   | "member.invited"
