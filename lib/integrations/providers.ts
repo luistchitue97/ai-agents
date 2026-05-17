@@ -86,6 +86,7 @@ export const integrationProviders: Record<string, IntegrationProvider> = {
         "email",
         "profile",
         "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/gmail.send",
       ],
       profileUrl: "https://www.googleapis.com/oauth2/v3/userinfo",
       tokenRequestEncoding: "form",

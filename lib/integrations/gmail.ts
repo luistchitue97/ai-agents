@@ -84,11 +84,18 @@ async function refreshAccessToken(connection: IntegrationConnection): Promise<st
 
 async function callGmail<T>(
   connection: IntegrationConnection,
-  path: string
+  path: string,
+  init?: { method?: string; body?: string; contentType?: string }
 ): Promise<T> {
   const tryFetch = async (token: string) =>
     fetch(`${GMAIL_BASE}${path}`, {
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      method: init?.method ?? "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        ...(init?.contentType ? { "Content-Type": init.contentType } : {}),
+      },
+      body: init?.body,
     })
 
   let token = decryptSecret(connection.accessToken)
@@ -189,6 +196,105 @@ function stripHtml(html: string): string {
     .replace(/&#39;/g, "'")
     .replace(/\s+/g, " ")
     .trim()
+}
+
+export type SendMessageInput = {
+  to: string
+  subject: string
+  body: string
+  cc?: string
+  bcc?: string
+}
+
+export type SendMessageResult = {
+  id: string
+  threadId: string
+}
+
+const EMAIL_REGEX = /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/
+
+function validateAddresses(field: string, raw: string): string {
+  // Allow comma-separated lists; trim each entry and validate independently.
+  const parts = raw
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean)
+  if (parts.length === 0) {
+    throw new Error(`${field} is required.`)
+  }
+  for (const p of parts) {
+    if (!EMAIL_REGEX.test(p)) {
+      throw new Error(`${field} contains an invalid address: ${p}`)
+    }
+  }
+  return parts.join(", ")
+}
+
+/**
+ * Construct an RFC 2822 message. Subject is MIME-encoded so non-ASCII characters
+ * (accents, emojis) survive transit, and the body is base64-encoded so we don't
+ * have to think about line endings or 8-bit cleanliness.
+ */
+function buildRfc2822(args: {
+  to: string
+  subject: string
+  body: string
+  cc?: string
+  bcc?: string
+}): string {
+  const subjectEncoded = `=?UTF-8?B?${Buffer.from(args.subject, "utf8").toString("base64")}?=`
+  const headerLines = [
+    `To: ${args.to}`,
+    args.cc ? `Cc: ${args.cc}` : null,
+    args.bcc ? `Bcc: ${args.bcc}` : null,
+    `Subject: ${subjectEncoded}`,
+    "MIME-Version: 1.0",
+    'Content-Type: text/plain; charset="UTF-8"',
+    "Content-Transfer-Encoding: base64",
+  ].filter((l): l is string => l !== null)
+
+  const encodedBody = Buffer.from(args.body, "utf8").toString("base64")
+  // RFC 2045 caps base64 lines at 76 chars.
+  const wrappedBody = encodedBody.match(/.{1,76}/g)?.join("\r\n") ?? encodedBody
+
+  return `${headerLines.join("\r\n")}\r\n\r\n${wrappedBody}`
+}
+
+/**
+ * Send an email via the connected Gmail account. The authenticated user is the
+ * From address — Gmail rejects sends that try to spoof another sender.
+ */
+export async function sendMessage(
+  organizationId: string,
+  input: SendMessageInput
+): Promise<SendMessageResult> {
+  if (!input.subject?.trim()) {
+    throw new Error("subject is required.")
+  }
+  if (!input.body?.trim()) {
+    throw new Error("body is required.")
+  }
+  const to = validateAddresses("to", input.to ?? "")
+  const cc = input.cc?.trim() ? validateAddresses("cc", input.cc) : undefined
+  const bcc = input.bcc?.trim() ? validateAddresses("bcc", input.bcc) : undefined
+
+  const connection = await prisma.integrationConnection.findFirst({
+    where: { organizationId, providerId: "gmail" },
+  })
+  if (!connection) {
+    throw new GmailReconnectRequired("Gmail is not connected for this organization.")
+  }
+
+  const rfc2822 = buildRfc2822({ to, subject: input.subject, body: input.body, cc, bcc })
+  // Gmail wants base64url, not standard base64.
+  const raw = Buffer.from(rfc2822, "utf8").toString("base64url")
+
+  type SendResponse = { id: string; threadId: string }
+  return await callGmail<SendResponse>(connection, "/messages/send", {
+    method: "POST",
+    contentType: "application/json",
+    body: JSON.stringify({ raw }),
+  })
 }
 
 export async function fetchMessageBody(

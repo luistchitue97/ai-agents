@@ -1,6 +1,10 @@
 import "server-only"
 
-import { fetchMessageBody, fetchRecentMessages } from "@/lib/integrations/gmail"
+import {
+  fetchMessageBody,
+  fetchRecentMessages,
+  sendMessage,
+} from "@/lib/integrations/gmail"
 
 import type { ProviderToolModule, ToolDefinition } from "./types"
 
@@ -61,7 +65,52 @@ const gmailGetMessageBody: ToolDefinition = {
   },
 }
 
+const gmailSendMessage: ToolDefinition = {
+  name: "gmail_send_message",
+  description:
+    "Send an email from the connected Gmail account. The From address is always " +
+    "the connected user — you cannot send as anyone else. Returns the new message id " +
+    "and thread id on success. Use sparingly: every call to this tool actually delivers " +
+    "an email. Compose the full body before calling — there's no draft or undo.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      to: {
+        type: "string",
+        description:
+          "Recipient email address. For multiple recipients, separate with commas.",
+      },
+      subject: {
+        type: "string",
+        description: "Subject line. UTF-8 is supported.",
+      },
+      body: {
+        type: "string",
+        description: "Plain-text body of the email.",
+      },
+      cc: {
+        type: "string",
+        description: "Optional CC addresses, comma-separated.",
+      },
+      bcc: {
+        type: "string",
+        description: "Optional BCC addresses, comma-separated.",
+      },
+    },
+    required: ["to", "subject", "body"],
+  },
+  handler: async (input, ctx) => {
+    return await sendMessage(ctx.organizationId, {
+      to: String(input.to ?? ""),
+      subject: String(input.subject ?? ""),
+      body: String(input.body ?? ""),
+      cc: typeof input.cc === "string" ? input.cc : undefined,
+      bcc: typeof input.bcc === "string" ? input.bcc : undefined,
+    })
+  },
+}
+
 export const gmailToolModule: ProviderToolModule = {
   providerId: "gmail",
-  buildTools: () => [gmailListMessages, gmailGetMessageBody],
+  buildTools: () => [gmailListMessages, gmailGetMessageBody, gmailSendMessage],
 }
